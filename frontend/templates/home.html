@@ -1,0 +1,22 @@
+{{define "title"}}Cards{{end}}
+{{define "content"}}
+<hgroup>
+  <h1>My cards</h1>
+  <p>Cards you assign here can open the door.</p>
+</hgroup>
+
+<article>
+  <header>Add a card</header>
+  <form hx-post="/htmx/cards" hx-target="#card-list" hx-swap="outerHTML">
+    <div class="grid">
+      <input type="text" name="card_uid" placeholder="Card UID" required>
+      <input type="text" name="label" placeholder="Label (optional)">
+    </div>
+    <button type="submit">Add card</button>
+  </form>
+</article>
+
+<div id="card-list" hx-get="/htmx/cards" hx-trigger="load">
+  <p aria-busy="true">Loading cards…</p>
+</div>
+{{end}}

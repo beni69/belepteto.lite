@@ -1,15 +1,25 @@
 package main
 
 import (
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"time"
 
+	"git.sch.bme.hu/vben/belepteto.lite/frontend"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func newRouter(logger *slog.Logger) http.Handler {
+type server struct {
+	logger *slog.Logger
+	tmpl   *Templates
+	store  *Store
+}
+
+func newRouter(logger *slog.Logger, tmpl *Templates, store *Store) http.Handler {
+	s := &server{logger: logger, tmpl: tmpl, store: store}
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -19,7 +29,34 @@ func newRouter(logger *slog.Logger) http.Handler {
 
 	r.Get("/healthz", handleHealthz)
 
+	staticFS, _ := fs.Sub(frontend.FS, "static")
+	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+
+	// frontend pages
+	r.Get("/", s.handleHome)
+	r.Get("/login", s.handleLoginPage)
+	r.Get("/admin", s.handleAdmin)
+
 	return r
+}
+
+func (s *server) handleHome(w http.ResponseWriter, r *http.Request) {
+	s.render(w, "home", map[string]any{"IsAdmin": true})
+}
+
+func (s *server) handleAdmin(w http.ResponseWriter, r *http.Request) {
+	s.render(w, "admin", map[string]any{"IsAdmin": true})
+}
+
+func (s *server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
+	s.render(w, "login", map[string]any{})
+}
+
+func (s *server) render(w http.ResponseWriter, name string, data any) {
+	if err := s.tmpl.Page(w, name, data); err != nil {
+		s.logger.Error("render page", "page", name, "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
 }
 
 func handleHealthz(w http.ResponseWriter, r *http.Request) {

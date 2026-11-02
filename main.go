@@ -46,11 +46,15 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	logger.Info("database ready", "path", cfg.dbPath)
-	_ = store
+
+	tmpl, err := LoadTemplates()
+	if err != nil {
+		return err
+	}
 
 	srv := &http.Server{
 		Addr:              cfg.httpAddr,
-		Handler:           newRouter(logger),
+		Handler:           newRouter(logger, tmpl, store),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

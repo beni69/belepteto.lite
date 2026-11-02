@@ -1,0 +1,28 @@
+{{define "card-list"}}
+<div id="card-list">
+  {{if .Cards}}
+  <table>
+    <thead>
+      <tr><th>Card UID</th><th>Label</th><th></th></tr>
+    </thead>
+    <tbody>
+      {{range .Cards}}
+      <tr>
+        <td><code>{{.CardUID}}</code></td>
+        <td>{{.Label}}</td>
+        <td>
+          <button class="secondary outline"
+                  hx-delete="/htmx/cards/{{.ID}}"
+                  hx-target="#card-list"
+                  hx-swap="outerHTML"
+                  hx-confirm="Remove this card?">Remove</button>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p>No cards yet. Add one above.</p>
+  {{end}}
+</div>
+{{end}}
