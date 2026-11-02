@@ -12,7 +12,14 @@ func (s *server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	s.render(w, "login", map[string]any{})
+	data := map[string]any{"SSOEnabled": s.sso != nil}
+	if s.sso != nil {
+		data["SSOButtonText"] = s.sso.buttonText
+	}
+	if r.URL.Query().Get("error") == "sso" {
+		data["Error"] = "SSO sign-in failed. Please try again or use your password."
+	}
+	s.render(w, "login", data)
 }
 
 func (s *server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
@@ -25,7 +32,11 @@ func (s *server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 			s.logger.Error("login lookup", "err", err)
 		}
 		w.WriteHeader(http.StatusUnauthorized)
-		s.render(w, "login", map[string]any{"Error": "Invalid email or password."})
+		s.render(w, "login", map[string]any{
+			"Error":         "Invalid email or password.",
+			"SSOEnabled":    s.sso != nil,
+			"SSOButtonText": ssoButtonText(s.sso),
+		})
 		return
 	}
 

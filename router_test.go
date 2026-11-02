@@ -70,6 +70,9 @@ func TestLoginPageRenders(t *testing.T) {
 	if !strings.Contains(string(body), "Log in to continue") {
 		t.Errorf("login page missing expected content")
 	}
+	if strings.Contains(string(body), defaultSSOLoginButtonText) || strings.Contains(string(body), "/sso/login") {
+		t.Errorf("SSO button should be hidden when SSO is not configured")
+	}
 }
 
 // noRedirectClient refuses to follow redirects so tests can assert on the 303
