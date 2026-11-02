@@ -12,8 +12,12 @@ import (
 )
 
 var (
-	ErrNotFound  = errors.New("not found")
-	ErrDuplicate = errors.New("already exists")
+	ErrNotFound         = errors.New("not found")
+	ErrDuplicate        = errors.New("already exists")
+	ErrAmbiguousEmail   = errors.New("email matches more than one user")
+	ErrInvalidWindow    = errors.New("invalid access time window")
+	ErrStaleRevision    = errors.New("snapshot revision is older than the current revision")
+	ErrRevisionConflict = errors.New("snapshot revision was already used with different data")
 )
 
 type Store struct {
@@ -34,7 +38,7 @@ func OpenStore(dsn string) (*Store, error) {
 	if err := migrateCardUID(db); err != nil {
 		return nil, fmt.Errorf("migrate card UID schema: %w", err)
 	}
-	if err := db.AutoMigrate(&User{}, &Session{}, &Card{}, &CardRead{}, &Entry{}); err != nil {
+	if err := db.AutoMigrate(&User{}, &Session{}, &Card{}, &AccessGrant{}, &AccessGrantSync{}, &CardRead{}, &Entry{}); err != nil {
 		return nil, fmt.Errorf("migrate schema: %w", err)
 	}
 
@@ -64,6 +68,22 @@ func migrateCardUID(db *gorm.DB) error {
 }
 
 func (s *Store) CreateUser(u *User) error {
+	u.Email = normalizeEmail(u.Email)
+	if u.Email == "" {
+		return errors.New("email is required")
+	}
+	var existing int64
+	if err := s.db.Model(&User{}).Where("LOWER(email) = ?", u.Email).Count(&existing).Error; err != nil {
+		return err
+	}
+	if existing > 0 {
+		return ErrDuplicate
+	}
+	if !u.PermanentAccess {
+		// GORM applies a bool default on zero values; create new users with the
+		// legacy always-allowed behavior, then change it explicitly if needed.
+		u.PermanentAccess = true
+	}
 	err := s.db.Create(u).Error
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return ErrDuplicate
@@ -85,15 +105,18 @@ func (s *Store) SetUserActive(id uint, active bool) error {
 }
 
 func (s *Store) UserByEmail(email string) (*User, error) {
-	var u User
-	err := s.db.Where("email = ?", email).First(&u).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrNotFound
-	}
+	var users []User
+	err := s.db.Where("LOWER(email) = ?", normalizeEmail(email)).Limit(2).Find(&users).Error
 	if err != nil {
 		return nil, err
 	}
-	return &u, nil
+	if len(users) == 0 {
+		return nil, ErrNotFound
+	}
+	if len(users) > 1 {
+		return nil, ErrAmbiguousEmail
+	}
+	return &users[0], nil
 }
 
 func (s *Store) UserByID(id uint) (*User, error) {

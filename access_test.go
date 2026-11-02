@@ -115,6 +115,49 @@ func TestAccessDeniedForInactiveUser(t *testing.T) {
 	}
 }
 
+func TestScheduledUserNeedsCurrentAccessGrant(t *testing.T) {
+	f := newAccessFixture(t)
+	allowed := seedUser(t, f.store, "allowed@example.com", "pw", false)
+	denied := seedUser(t, f.store, "denied@example.com", "pw", false)
+	seedCard(t, f.store, allowed.ID, "aa:bb:cc:10", "")
+	seedCard(t, f.store, denied.ID, "aa:bb:cc:11", "")
+	if err := f.store.SetUserPermanentAccess(allowed.ID, false); err != nil {
+		t.Fatalf("make first user time-limited: %v", err)
+	}
+	if err := f.store.SetUserPermanentAccess(denied.ID, false); err != nil {
+		t.Fatalf("make second user time-limited: %v", err)
+	}
+	now := time.Now().UTC()
+	if err := f.store.CreateManualAccessGrant(allowed.ID, now.Add(-time.Minute), now.Add(time.Minute)); err != nil {
+		t.Fatalf("create active window: %v", err)
+	}
+
+	f.sendCardRead(t, `{"cards":[{"cardID":"aa:bb:cc:10"}],"id":110,"timestamp":0}`)
+	if got := waitFor(t, f.door); got != "open 110" {
+		t.Fatalf("doorControl = %q, want %q", got, "open 110")
+	}
+
+	f.sendCardRead(t, `{"cards":[{"cardID":"aa:bb:cc:11"}],"id":111,"timestamp":0}`)
+	if got := waitFor(t, f.door); got != "deny 111" {
+		t.Fatalf("doorControl = %q, want %q", got, "deny 111")
+	}
+}
+
+func TestTemporaryWindowDoesNotRemovePermanentAccess(t *testing.T) {
+	f := newAccessFixture(t)
+	user := seedUser(t, f.store, "permanent@example.com", "pw", false)
+	seedCard(t, f.store, user.ID, "aa:bb:cc:12", "")
+	now := time.Now().UTC()
+	if err := f.store.CreateManualAccessGrant(user.ID, now.Add(-2*time.Hour), now.Add(-time.Hour)); err != nil {
+		t.Fatalf("create expired window: %v", err)
+	}
+
+	f.sendCardRead(t, `{"cards":[{"cardID":"aa:bb:cc:12"}],"id":112,"timestamp":0}`)
+	if got := waitFor(t, f.door); got != "open 112" {
+		t.Fatalf("doorControl = %q, want %q", got, "open 112")
+	}
+}
+
 func TestAccessUIDFormattingIsSignificant(t *testing.T) {
 	f := newAccessFixture(t)
 	u := seedUser(t, f.store, "u@example.com", "pw", false)

@@ -12,14 +12,19 @@ import (
 )
 
 type server struct {
-	logger *slog.Logger
-	tmpl   *Templates
-	store  *Store
-	access *AccessService
+	logger           *slog.Logger
+	tmpl             *Templates
+	store            *Store
+	access           *AccessService
+	externalAPIToken string
 }
 
-func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *AccessService) http.Handler {
-	s := &server{logger: logger, tmpl: tmpl, store: store, access: access}
+func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *AccessService, externalAPITokens ...string) http.Handler {
+	externalAPIToken := ""
+	if len(externalAPITokens) > 0 {
+		externalAPIToken = externalAPITokens[0]
+	}
+	s := &server{logger: logger, tmpl: tmpl, store: store, access: access, externalAPIToken: externalAPIToken}
 
 	r := chi.NewRouter()
 
@@ -29,6 +34,14 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *Acces
 	r.Use(requestLogger(logger))
 
 	r.Get("/healthz", handleHealthz)
+
+	// Machine-to-machine API. Every endpoint in this group requires the
+	// configured external bearer token.
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(s.RequireExternalAPIToken)
+		r.Put("/access-grant-sets", s.handleExternalAccessGrantSetPut)
+		r.Get("/access-grant-sets", s.handleExternalAccessGrantSetGet)
+	})
 
 	staticFS, _ := fs.Sub(frontend.FS, "static")
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
@@ -57,6 +70,12 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *Acces
 			r.Post("/htmx/admin/users", s.handleAdminUserCreate)
 			r.Post("/htmx/admin/users/{id}/activate", s.handleAdminUserActivate)
 			r.Post("/htmx/admin/users/{id}/deactivate", s.handleAdminUserDeactivate)
+			r.Post("/htmx/admin/users/{id}/scheduled-access", s.handleAdminUserScheduledAccess)
+			r.Post("/htmx/admin/users/{id}/permanent-access", s.handleAdminUserPermanentAccess)
+
+			r.Get("/htmx/admin/access-grants", s.handleAdminAccessGrantList)
+			r.Post("/htmx/admin/access-grants", s.handleAdminAccessGrantCreate)
+			r.Post("/htmx/admin/access-grants/{id}/revoke", s.handleAdminAccessGrantRevoke)
 
 			r.Get("/htmx/admin/logs/entries", s.handleAdminEntryLog)
 			r.Get("/htmx/admin/logs/cardreads", s.handleAdminCardReadLog)
@@ -73,7 +92,13 @@ func (s *server) handleHome(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 	u := userFromContext(r.Context())
-	s.render(w, "admin", map[string]any{"IsAdmin": u.Admin})
+	users, err := s.store.ListUsers()
+	if err != nil {
+		s.logger.Error("list users for admin page", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	s.render(w, "admin", map[string]any{"IsAdmin": u.Admin, "Users": users})
 }
 
 func (s *server) render(w http.ResponseWriter, name string, data any) {

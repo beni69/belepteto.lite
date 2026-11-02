@@ -16,22 +16,24 @@ import (
 )
 
 type config struct {
-	httpAddr      string
-	dbPath        string
-	adminEmail    string
-	adminPassword string
-	mqttAddr      string
-	controllerID  string
+	httpAddr               string
+	dbPath                 string
+	adminEmail             string
+	adminPassword          string
+	mqttAddr               string
+	controllerID           string
+	externalAPIAccessToken string
 }
 
 func loadConfig() config {
 	return config{
-		httpAddr:      envOr("BELEPTETO_HTTP_ADDR", ":8080"),
-		dbPath:        envOr("BELEPTETO_DB_PATH", "belepteto.db"),
-		adminEmail:    envOr("BELEPTETO_ADMIN_EMAIL", "admin@example.com"),
-		adminPassword: os.Getenv("BELEPTETO_ADMIN_PASSWORD"),
-		mqttAddr:      envOr("BELEPTETO_MQTT_ADDR", ":1883"),
-		controllerID:  envOr("BELEPTETO_CONTROLLER_ID", "1619"),
+		httpAddr:               envOr("BELEPTETO_HTTP_ADDR", ":8080"),
+		dbPath:                 envOr("BELEPTETO_DB_PATH", "belepteto.db"),
+		adminEmail:             envOr("BELEPTETO_ADMIN_EMAIL", "admin@example.com"),
+		adminPassword:          os.Getenv("BELEPTETO_ADMIN_PASSWORD"),
+		mqttAddr:               envOr("BELEPTETO_MQTT_ADDR", ":1883"),
+		controllerID:           envOr("BELEPTETO_CONTROLLER_ID", "1619"),
+		externalAPIAccessToken: strings.TrimSpace(os.Getenv("EXTERNAL_API_ACCESS_TOKEN")),
 	}
 }
 
@@ -126,7 +128,7 @@ func run(logger *slog.Logger) error {
 
 	srv := &http.Server{
 		Addr:              cfg.httpAddr,
-		Handler:           newRouter(logger, tmpl, store, access),
+		Handler:           newRouter(logger, tmpl, store, access, cfg.externalAPIAccessToken),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

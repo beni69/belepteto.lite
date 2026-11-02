@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"strings"
 	"sync"
@@ -171,18 +172,28 @@ func (a *AccessService) handleAccessRead(msg CardReadMsg, received time.Time) {
 	var matchedUser *User
 
 	for _, sc := range msg.Cards {
-		card, user, err := a.store.ActiveCardOwner(sc.CardID)
-		accepted := err == nil
-		if accepted {
-			anyMatch = true
-			matchedUser = user
-			_ = card
+		_, user, err := a.store.ActiveCardOwner(sc.CardID)
+		var uid *uint
+		accepted := false
+		if err == nil {
+			uid = &user.ID
+			if user.PermanentAccess {
+				accepted = true
+			} else {
+				accepted, err = a.store.HasActiveAccessGrant(user.ID, received)
+				if err != nil {
+					a.logger.Error("check scheduled access", "user", user.ID, "err", err)
+					accepted = false
+				}
+			}
+			if accepted {
+				anyMatch = true
+				matchedUser = user
+			}
+		} else if !errors.Is(err, ErrNotFound) {
+			a.logger.Error("look up card owner", "err", err)
 		}
 
-		var uid *uint
-		if accepted {
-			uid = &user.ID
-		}
 		if logErr := a.store.CreateCardRead(&CardRead{
 			CardUID:   sc.CardID,
 			UserID:    uid,
