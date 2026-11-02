@@ -92,6 +92,41 @@ func (s *Store) CardsByUser(userID uint) ([]Card, error) {
 	return cards, err
 }
 
+func (s *Store) CreateCard(c *Card) error {
+	err := s.db.Create(c).Error
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return ErrDuplicate
+	}
+	return err
+}
+
+// DeleteUserCard removes a card only if it belongs to the given user. Returns
+// ErrNotFound if the card does not exist or is owned by someone else.
+func (s *Store) DeleteUserCard(userID, cardID uint) error {
+	res := s.db.Where("id = ? AND user_id = ?", cardID, userID).Delete(&Card{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// RelabelUserCard updates a card's label only if it belongs to the given user.
+func (s *Store) RelabelUserCard(userID, cardID uint, label string) error {
+	res := s.db.Model(&Card{}).
+		Where("id = ? AND user_id = ?", cardID, userID).
+		Update("label", label)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) CardByUID(uid string) (*Card, error) {
 	var c Card
 	err := s.db.Where("card_uid = ?", uid).First(&c).Error

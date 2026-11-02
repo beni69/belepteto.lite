@@ -7,7 +7,8 @@
 
 <article>
   <header>Add a card</header>
-  <form hx-post="/htmx/cards" hx-target="#card-list" hx-swap="outerHTML">
+  <form hx-post="/htmx/cards" hx-target="#card-list" hx-swap="outerHTML"
+        hx-on::after-request="if(event.detail.successful) this.reset()">
     <div class="grid">
       <input type="text" name="card_uid" placeholder="Card UID" required>
       <input type="text" name="label" placeholder="Label (optional)">

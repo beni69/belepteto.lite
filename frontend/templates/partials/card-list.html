@@ -1,5 +1,6 @@
 {{define "card-list"}}
 <div id="card-list">
+  {{if .Error}}<p style="color: var(--pico-del-color);">{{.Error}}</p>{{end}}
   {{if .Cards}}
   <table>
     <thead>
@@ -9,7 +10,13 @@
       {{range .Cards}}
       <tr>
         <td><code>{{.CardUID}}</code></td>
-        <td>{{.Label}}</td>
+        <td>
+          <form hx-post="/htmx/cards/{{.ID}}/relabel" hx-target="#card-list" hx-swap="outerHTML">
+            <input type="text" name="label" value="{{.Label}}" placeholder="Label"
+                   aria-label="Label for card {{.CardUID}}"
+                   hx-trigger="change">
+          </form>
+        </td>
         <td>
           <button class="secondary outline"
                   hx-delete="/htmx/cards/{{.ID}}"

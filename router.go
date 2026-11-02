@@ -42,6 +42,11 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store) http.Handler 
 		r.Use(s.RequireAuth)
 		r.Get("/", s.handleHome)
 
+		r.Get("/htmx/cards", s.handleCardList)
+		r.Post("/htmx/cards", s.handleCardCreate)
+		r.Delete("/htmx/cards/{id}", s.handleCardDelete)
+		r.Post("/htmx/cards/{id}/relabel", s.handleCardRelabel)
+
 		r.Group(func(r chi.Router) {
 			r.Use(s.RequireAdmin)
 			r.Get("/admin", s.handleAdmin)

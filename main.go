@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -18,6 +19,8 @@ type config struct {
 	dbPath        string
 	adminEmail    string
 	adminPassword string
+	mqttAddr      string
+	controllerID  string
 }
 
 func loadConfig() config {
@@ -26,6 +29,8 @@ func loadConfig() config {
 		dbPath:        envOr("BELEPTETO_DB_PATH", "belepteto.db"),
 		adminEmail:    envOr("BELEPTETO_ADMIN_EMAIL", "admin@example.com"),
 		adminPassword: os.Getenv("BELEPTETO_ADMIN_PASSWORD"),
+		mqttAddr:      envOr("BELEPTETO_MQTT_ADDR", ":1883"),
+		controllerID:  envOr("BELEPTETO_CONTROLLER_ID", "1619"),
 	}
 }
 
@@ -90,6 +95,15 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
+	broker, err := NewBroker(logger, cfg.mqttAddr)
+	if err != nil {
+		return err
+	}
+	if err := broker.Start(); err != nil {
+		return fmt.Errorf("start mqtt broker: %w", err)
+	}
+	logger.Info("mqtt broker listening", "addr", cfg.mqttAddr, "controller", cfg.controllerID)
+
 	srv := &http.Server{
 		Addr:              cfg.httpAddr,
 		Handler:           newRouter(logger, tmpl, store),
@@ -111,6 +125,7 @@ func run(logger *slog.Logger) error {
 
 	select {
 	case err := <-serverErr:
+		_ = broker.Close()
 		return err
 	case <-rootCtx.Done():
 		logger.Info("shutdown signal received, draining connections")
@@ -120,7 +135,12 @@ func run(logger *slog.Logger) error {
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
+		_ = broker.Close()
 		return err
+	}
+
+	if err := broker.Close(); err != nil {
+		logger.Error("mqtt broker close", "err", err)
 	}
 
 	logger.Info("shutdown complete")
