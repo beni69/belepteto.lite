@@ -1,0 +1,21 @@
+{{define "pager"}}
+<nav>
+  <ul>
+    <li>
+      {{if .HasPrev}}
+      <button class="outline" hx-get="{{.BaseURL}}?{{.PrevQuery}}" hx-target="#{{.TargetID}}" hx-swap="outerHTML">&larr; Prev</button>
+      {{else}}
+      <button class="outline" disabled>&larr; Prev</button>
+      {{end}}
+    </li>
+    <li><small>Page {{.Page}} of {{.TotalPages}}</small></li>
+    <li>
+      {{if .HasNext}}
+      <button class="outline" hx-get="{{.BaseURL}}?{{.NextQuery}}" hx-target="#{{.TargetID}}" hx-swap="outerHTML">Next &rarr;</button>
+      {{else}}
+      <button class="outline" disabled>Next &rarr;</button>
+      {{end}}
+    </li>
+  </ul>
+</nav>
+{{end}}

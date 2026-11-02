@@ -92,12 +92,48 @@ func (s *Store) CardsByUser(userID uint) ([]Card, error) {
 	return cards, err
 }
 
+// CreateCard inserts a card. The canonical UID is derived from CardUID so the
+// caller only needs to set the colon-hex CardUID, label, user, and active flag.
 func (s *Store) CreateCard(c *Card) error {
+	c.CardUIDCanonical = CanonicalCardUID(c.CardUID)
 	err := s.db.Create(c).Error
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return ErrDuplicate
 	}
 	return err
+}
+
+// CardExistsByCanonical reports whether any card matches the given UID under
+// lenient (canonical) comparison.
+func (s *Store) CardExistsByCanonical(uid string) (bool, error) {
+	var n int64
+	err := s.db.Model(&Card{}).
+		Where("card_uid_canonical = ?", CanonicalCardUID(uid)).
+		Count(&n).Error
+	return n > 0, err
+}
+
+// ActiveCardOwner returns the active user who owns an active card matching the
+// given UID (lenient). Returns ErrNotFound if there is no match, the card is
+// inactive, or the owner is inactive.
+func (s *Store) ActiveCardOwner(uid string) (*Card, *User, error) {
+	var c Card
+	err := s.db.Where("card_uid_canonical = ? AND active = ?", CanonicalCardUID(uid), true).
+		First(&c).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	u, err := s.UserByID(c.UserID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !u.Active {
+		return nil, nil, ErrNotFound
+	}
+	return &c, u, nil
 }
 
 // DeleteUserCard removes a card only if it belongs to the given user. Returns
@@ -127,22 +163,68 @@ func (s *Store) RelabelUserCard(userID, cardID uint, label string) error {
 	return nil
 }
 
-func (s *Store) CardByUID(uid string) (*Card, error) {
-	var c Card
-	err := s.db.Where("card_uid = ?", uid).First(&c).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &c, nil
-}
-
 func (s *Store) CountUsers() (int64, error) {
 	var n int64
 	err := s.db.Model(&User{}).Count(&n).Error
 	return n, err
+}
+
+// CardReadView is a cardRead log row joined with the resolved user's email.
+type CardReadView struct {
+	CardUID   string
+	Email     string // empty if the card was unknown
+	Accepted  bool
+	CreatedAt time.Time
+}
+
+// EntryView is an entry log row joined with the opener's email.
+type EntryView struct {
+	Email     string
+	CardUID   *string // null => remote open (future)
+	CreatedAt time.Time
+}
+
+// ListCardReads returns cardRead log rows newest-first, paginated. When
+// acceptedOnly is true, only accepted reads are returned. It also returns the
+// total count for the active filter so the caller can paginate.
+func (s *Store) ListCardReads(acceptedOnly bool, limit, offset int) ([]CardReadView, int64, error) {
+	q := s.db.Model(&CardRead{})
+	if acceptedOnly {
+		q = q.Where("card_reads.accepted = ?", true)
+	}
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var views []CardReadView
+	err := q.
+		Select("card_reads.card_uid AS card_uid, card_reads.accepted AS accepted, card_reads.created_at AS created_at, users.email AS email").
+		Joins("LEFT JOIN users ON users.id = card_reads.user_id").
+		Order("card_reads.created_at DESC").
+		Limit(limit).Offset(offset).
+		Scan(&views).Error
+	return views, total, err
+}
+
+// ListEntries returns entry log rows newest-first, paginated, with the total.
+func (s *Store) ListEntries(limit, offset int) ([]EntryView, int64, error) {
+	q := s.db.Model(&Entry{})
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var views []EntryView
+	err := q.
+		Select("entries.card_uid AS card_uid, entries.created_at AS created_at, users.email AS email").
+		Joins("LEFT JOIN users ON users.id = entries.user_id").
+		Order("entries.created_at DESC").
+		Limit(limit).Offset(offset).
+		Scan(&views).Error
+	return views, total, err
 }
 
 // SeedAdmin creates an initial admin user if the users table is empty. It

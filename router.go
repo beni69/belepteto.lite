@@ -15,10 +15,11 @@ type server struct {
 	logger *slog.Logger
 	tmpl   *Templates
 	store  *Store
+	access *AccessService
 }
 
-func newRouter(logger *slog.Logger, tmpl *Templates, store *Store) http.Handler {
-	s := &server{logger: logger, tmpl: tmpl, store: store}
+func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *AccessService) http.Handler {
+	s := &server{logger: logger, tmpl: tmpl, store: store, access: access}
 
 	r := chi.NewRouter()
 
@@ -43,7 +44,8 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store) http.Handler 
 		r.Get("/", s.handleHome)
 
 		r.Get("/htmx/cards", s.handleCardList)
-		r.Post("/htmx/cards", s.handleCardCreate)
+		r.Post("/htmx/cards/pair", s.handleCardPairStart)
+		r.Get("/htmx/cards/pair/status", s.handleCardPairStatus)
 		r.Delete("/htmx/cards/{id}", s.handleCardDelete)
 		r.Post("/htmx/cards/{id}/relabel", s.handleCardRelabel)
 
@@ -55,6 +57,9 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store) http.Handler 
 			r.Post("/htmx/admin/users", s.handleAdminUserCreate)
 			r.Post("/htmx/admin/users/{id}/activate", s.handleAdminUserActivate)
 			r.Post("/htmx/admin/users/{id}/deactivate", s.handleAdminUserDeactivate)
+
+			r.Get("/htmx/admin/logs/entries", s.handleAdminEntryLog)
+			r.Get("/htmx/admin/logs/cardreads", s.handleAdminCardReadLog)
 		})
 	})
 

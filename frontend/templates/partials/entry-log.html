@@ -1,0 +1,23 @@
+{{define "entry-log"}}
+<div id="entry-log">
+  {{if .Rows}}
+  <table>
+    <thead>
+      <tr><th>Time</th><th>User</th><th>Card UID</th></tr>
+    </thead>
+    <tbody>
+      {{range .Rows}}
+      <tr>
+        <td>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+        <td>{{if .Email}}{{.Email}}{{else}}<i>unknown</i>{{end}}</td>
+        <td>{{if .CardUID}}<code>{{.CardUID}}</code>{{else}}<i>remote</i>{{end}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{template "pager" .}}
+  {{else}}
+  <p>No entries yet.</p>
+  {{end}}
+</div>
+{{end}}

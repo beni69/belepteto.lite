@@ -20,7 +20,8 @@ func authTestServer(t *testing.T) (*httptest.Server, *Store) {
 		t.Fatalf("LoadTemplates: %v", err)
 	}
 	store := newTestStore(t)
-	srv := httptest.NewServer(newRouter(logger, tmpl, store))
+	access := newTestAccess(t, store)
+	srv := httptest.NewServer(newRouter(logger, tmpl, store, access))
 	t.Cleanup(srv.Close)
 	return srv, store
 }

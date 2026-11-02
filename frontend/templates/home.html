@@ -6,15 +6,13 @@
 </hgroup>
 
 <article>
-  <header>Add a card</header>
-  <form hx-post="/htmx/cards" hx-target="#card-list" hx-swap="outerHTML"
-        hx-on::after-request="if(event.detail.successful) this.reset()">
-    <div class="grid">
-      <input type="text" name="card_uid" placeholder="Card UID" required>
-      <input type="text" name="label" placeholder="Label (optional)">
-    </div>
-    <button type="submit">Add card</button>
-  </form>
+  <header>Pair a card</header>
+  <p>Put the reader into pairing mode, then swipe the card you want to add.</p>
+  <div id="pair-area">
+    <button hx-post="/htmx/cards/pair" hx-target="#pair-area" hx-swap="innerHTML">
+      Pair a card
+    </button>
+  </div>
 </article>
 
 <div id="card-list" hx-get="/htmx/cards" hx-trigger="load">

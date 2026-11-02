@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -94,6 +95,79 @@ func (s *server) setUserActive(w http.ResponseWriter, r *http.Request, active bo
 
 	if err := s.tmpl.Fragment(w, "user-row", user); err != nil {
 		s.logger.Error("render user-row", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+}
+
+const logPageSize = 20
+
+// parsePage returns a 1-based page number from the query string, defaulting to 1.
+func parsePage(r *http.Request) int {
+	p, err := strconv.Atoi(r.URL.Query().Get("page"))
+	if err != nil || p < 1 {
+		return 1
+	}
+	return p
+}
+
+// pagerData holds the fields the shared "pager" fragment needs.
+func pagerData(baseURL, targetID string, page int, total int64, extraQuery string) map[string]any {
+	totalPages := int((total + int64(logPageSize) - 1) / int64(logPageSize))
+	if totalPages < 1 {
+		totalPages = 1
+	}
+	sep := ""
+	if extraQuery != "" {
+		sep = extraQuery + "&"
+	}
+	return map[string]any{
+		"BaseURL":    baseURL,
+		"TargetID":   targetID,
+		"Page":       page,
+		"TotalPages": totalPages,
+		"HasPrev":    page > 1,
+		"HasNext":    page < totalPages,
+		"PrevQuery":  fmt.Sprintf("%spage=%d", sep, page-1),
+		"NextQuery":  fmt.Sprintf("%spage=%d", sep, page+1),
+	}
+}
+
+func (s *server) handleAdminEntryLog(w http.ResponseWriter, r *http.Request) {
+	page := parsePage(r)
+	rows, total, err := s.store.ListEntries(logPageSize, (page-1)*logPageSize)
+	if err != nil {
+		s.logger.Error("list entries", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	data := pagerData("/htmx/admin/logs/entries", "entry-log", page, total, "")
+	data["Rows"] = rows
+	if err := s.tmpl.Fragment(w, "entry-log", data); err != nil {
+		s.logger.Error("render entry-log", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+}
+
+func (s *server) handleAdminCardReadLog(w http.ResponseWriter, r *http.Request) {
+	page := parsePage(r)
+	acceptedOnly := r.URL.Query().Get("accepted") == "1"
+
+	rows, total, err := s.store.ListCardReads(acceptedOnly, logPageSize, (page-1)*logPageSize)
+	if err != nil {
+		s.logger.Error("list card reads", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	extra := ""
+	if acceptedOnly {
+		extra = "accepted=1"
+	}
+	data := pagerData("/htmx/admin/logs/cardreads", "cardread-log", page, total, extra)
+	data["Rows"] = rows
+	data["AcceptedOnly"] = acceptedOnly
+	if err := s.tmpl.Fragment(w, "cardread-log", data); err != nil {
+		s.logger.Error("render cardread-log", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 	}
 }

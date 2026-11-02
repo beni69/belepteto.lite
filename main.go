@@ -104,9 +104,15 @@ func run(logger *slog.Logger) error {
 	}
 	logger.Info("mqtt broker listening", "addr", cfg.mqttAddr, "controller", cfg.controllerID)
 
+	access := NewAccessService(store, broker, NewControllerTopics(cfg.controllerID), logger)
+	if err := access.Start(); err != nil {
+		_ = broker.Close()
+		return fmt.Errorf("start access service: %w", err)
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.httpAddr,
-		Handler:           newRouter(logger, tmpl, store),
+		Handler:           newRouter(logger, tmpl, store, access),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -125,6 +131,7 @@ func run(logger *slog.Logger) error {
 
 	select {
 	case err := <-serverErr:
+		access.Close()
 		_ = broker.Close()
 		return err
 	case <-rootCtx.Done():
@@ -133,6 +140,8 @@ func run(logger *slog.Logger) error {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	access.Close()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		_ = broker.Close()

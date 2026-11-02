@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -119,6 +120,21 @@ const (
 	HealthcheckUp   = "true"
 	HealthcheckDown = "false"
 )
+
+// CanonicalCardUID produces the lenient match key for a card UID: colons and
+// whitespace removed, upper-cased. The reader sends colon-hex like
+// "aa:bb:cc:dd:00:00:00:00"; users may store the same card in any casing, so
+// matching compares canonical forms.
+func CanonicalCardUID(uid string) string {
+	var b strings.Builder
+	for _, r := range uid {
+		if r == ':' || r == ' ' || r == '\t' || r == '\n' || r == '\r' {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return strings.ToUpper(b.String())
+}
 
 // EventTime converts a spec timestamp to a time.Time. Per the spec, a timestamp
 // of 0 means "use the time the message was received", so callers pass the

@@ -14,31 +14,6 @@ func (s *server) handleCardList(w http.ResponseWriter, r *http.Request) {
 	s.renderCardList(w, u.ID, "")
 }
 
-func (s *server) handleCardCreate(w http.ResponseWriter, r *http.Request) {
-	u := userFromContext(r.Context())
-
-	uid := normalizeCardUID(r.FormValue("card_uid"))
-	label := strings.TrimSpace(r.FormValue("label"))
-
-	if uid == "" {
-		s.renderCardList(w, u.ID, "Card UID is required.")
-		return
-	}
-
-	err := s.store.CreateCard(&Card{UserID: u.ID, CardUID: uid, Label: label, Active: true})
-	if errors.Is(err, ErrDuplicate) {
-		s.renderCardList(w, u.ID, "That card is already registered.")
-		return
-	}
-	if err != nil {
-		s.logger.Error("create card", "err", err)
-		s.renderCardList(w, u.ID, "Could not add the card.")
-		return
-	}
-
-	s.renderCardList(w, u.ID, "")
-}
-
 func (s *server) handleCardDelete(w http.ResponseWriter, r *http.Request) {
 	u := userFromContext(r.Context())
 
@@ -105,8 +80,29 @@ func (s *server) renderCardList(w http.ResponseWriter, userID uint, errMsg strin
 	}
 }
 
-// normalizeCardUID trims whitespace and upper-cases the UID so the same physical
-// card can't be registered twice under different casing.
-func normalizeCardUID(raw string) string {
-	return strings.ToUpper(strings.TrimSpace(raw))
+// handleCardPairStart puts the reader into pairing mode for the current user.
+// The next card read will be assigned to them rather than opening the door.
+func (s *server) handleCardPairStart(w http.ResponseWriter, r *http.Request) {
+	u := userFromContext(r.Context())
+	s.access.StartPairing(u.ID)
+	s.renderPairStatus(w, u.ID)
+}
+
+// handleCardPairStatus is polled by the browser while pairing is in progress.
+// It returns the current status fragment; once resolved, the fragment stops
+// polling and reloads the card list.
+func (s *server) handleCardPairStatus(w http.ResponseWriter, r *http.Request) {
+	u := userFromContext(r.Context())
+	s.renderPairStatus(w, u.ID)
+}
+
+func (s *server) renderPairStatus(w http.ResponseWriter, userID uint) {
+	st := s.access.PairingStatusFor(userID)
+	if err := s.tmpl.Fragment(w, "pair-status", map[string]any{
+		"State":   string(st.State),
+		"Message": st.Message,
+	}); err != nil {
+		s.logger.Error("render pair-status", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
 }

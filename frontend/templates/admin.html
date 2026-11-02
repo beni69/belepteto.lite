@@ -26,4 +26,20 @@
 <div id="user-list" hx-get="/htmx/admin/users" hx-trigger="load">
   <p aria-busy="true">Loading users…</p>
 </div>
+
+<article>
+  <header>Entry log</header>
+  <p>Every time the door opened.</p>
+  <div id="entry-log" hx-get="/htmx/admin/logs/entries" hx-trigger="load">
+    <p aria-busy="true">Loading entries…</p>
+  </div>
+</article>
+
+<article>
+  <header>Card reads</header>
+  <p>Every card presented to the reader.</p>
+  <div id="cardread-log" hx-get="/htmx/admin/logs/cardreads" hx-trigger="load">
+    <p aria-busy="true">Loading card reads…</p>
+  </div>
+</article>
 {{end}}

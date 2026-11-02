@@ -1,0 +1,23 @@
+{{define "pair-status"}}
+<div id="pair-area">
+  {{if eq .State "waiting"}}
+    <div hx-get="/htmx/cards/pair/status" hx-target="#pair-area" hx-swap="innerHTML"
+         hx-trigger="every 1s">
+      <p aria-busy="true">{{.Message}}</p>
+    </div>
+  {{else if eq .State "paired"}}
+    <p style="color: var(--pico-ins-color);">{{.Message}}</p>
+    <button hx-get="/htmx/cards/pair/status" hx-target="#pair-area" hx-swap="innerHTML">Pair another</button>
+    <div hx-get="/htmx/cards" hx-target="#card-list" hx-swap="outerHTML" hx-trigger="load"></div>
+  {{else if eq .State "busy"}}
+    <p style="color: var(--pico-del-color);">{{.Message}}</p>
+    <button hx-post="/htmx/cards/pair" hx-target="#pair-area" hx-swap="innerHTML">Try again</button>
+  {{else if eq .State "idle"}}
+    <button hx-post="/htmx/cards/pair" hx-target="#pair-area" hx-swap="innerHTML">Pair a card</button>
+  {{else}}
+    {{/* timeout, duplicate, error */}}
+    <p style="color: var(--pico-del-color);">{{.Message}}</p>
+    <button hx-post="/htmx/cards/pair" hx-target="#pair-area" hx-swap="innerHTML">Try again</button>
+  {{end}}
+</div>
+{{end}}

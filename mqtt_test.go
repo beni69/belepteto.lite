@@ -22,6 +22,21 @@ func newTestBroker(t *testing.T) *Broker {
 	return b
 }
 
+// newTestAccess builds a test broker + access service wired to the given store,
+// starts the cardRead subscription, and returns the service. Used by web-layer
+// tests that need the router's AccessService dependency.
+func newTestAccess(t *testing.T, store *Store) *AccessService {
+	t.Helper()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	b := newTestBroker(t)
+	access := NewAccessService(store, b, NewControllerTopics("TEST"), logger)
+	if err := access.Start(); err != nil {
+		t.Fatalf("access.Start: %v", err)
+	}
+	t.Cleanup(access.Close)
+	return access
+}
+
 func TestBrokerInlinePublishSubscribe(t *testing.T) {
 	b := newTestBroker(t)
 
