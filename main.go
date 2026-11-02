@@ -13,11 +13,13 @@ import (
 
 type config struct {
 	httpAddr string
+	dbPath   string
 }
 
 func loadConfig() config {
 	return config{
 		httpAddr: envOr("BELEPTETO_HTTP_ADDR", ":8080"),
+		dbPath:   envOr("BELEPTETO_DB_PATH", "belepteto.db"),
 	}
 }
 
@@ -38,6 +40,13 @@ func main() {
 
 func run(logger *slog.Logger) error {
 	cfg := loadConfig()
+
+	store, err := OpenStore(cfg.dbPath)
+	if err != nil {
+		return err
+	}
+	logger.Info("database ready", "path", cfg.dbPath)
+	_ = store
 
 	srv := &http.Server{
 		Addr:              cfg.httpAddr,
