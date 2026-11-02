@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -69,8 +70,21 @@ func seedAdmin(logger *slog.Logger, store *Store, cfg config) error {
 	return nil
 }
 
+func logLevel() slog.Level {
+	switch strings.ToLower(os.Getenv("BELEPTETO_LOG_LEVEL")) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel()}))
 	if err := run(logger); err != nil {
 		logger.Error("server exited with error", "err", err)
 		os.Exit(1)
