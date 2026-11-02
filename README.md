@@ -85,7 +85,7 @@ mosquitto_sub -h localhost -p 1883 -t 'controller/1619/doorControl'
 
 # in another shell, simulate a card scan
 mosquitto_pub -h localhost -p 1883 -t 'controller/1619/cardRead' \
-  -m '{"cards":[{"cardID":"aa:bb:cc:dd:00:00:00:00"}],"id":42,"timestamp":0}'
+  -m '{"cards":[{"cardID":"AA:BB:CC:DD:00:00:00:00"}],"id":42,"timestamp":0}'
 ```
 
 An unregistered card yields `deny 42`; a card paired to an active user yields
@@ -94,9 +94,10 @@ An unregistered card yields `deny 42`; a card paired to an active user yields
 ## How access works
 
 1. The reader publishes a `cardRead` (one or more cards, a correlation `id`).
-2. The server looks up each card. Matching is lenient: UIDs are compared with
-   colons/whitespace stripped and upper-cased, so formatting differences do not
-   matter. The card is stored in the reader's colon-hex form.
+2. The server uppercases each UID and looks it up exactly as received otherwise.
+   Reader UIDs are expected in colon-separated hexadecimal form, so separators
+   and other formatting are significant. The card is stored in uppercase
+   colon-hex form.
 3. If any scanned card belongs to an active card owned by an active user, the
    server publishes `open <id>` and records an **entry**. Otherwise it publishes
    `deny <id>`. Every scan is recorded as a **card read**.

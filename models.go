@@ -22,16 +22,13 @@ type Session struct {
 
 type Card struct {
 	ID uint `gorm:"primaryKey"`
-	// CardUID stores the reader's original colon-hex form, e.g.
-	// "aa:bb:cc:dd:00:00:00:00", so it can round-trip to the device later.
-	CardUID string `gorm:"not null"`
-	// CardUIDCanonical is the lenient match key (colons/whitespace stripped,
-	// upper-cased). Uniqueness and reader lookups use this column.
-	CardUIDCanonical string `gorm:"uniqueIndex;not null"`
-	UserID           uint   `gorm:"index;not null"`
-	Label            string
-	Active           bool `gorm:"not null;default:true"`
-	CreatedAt        time.Time
+	// stores the reader's colon-hex form in uppercase
+	// "AA:BB:CC:DD:00:00:00:00"
+	CardUID   string `gorm:"uniqueIndex;not null"`
+	UserID    uint   `gorm:"index;not null"`
+	Label     string
+	Active    bool `gorm:"not null;default:true"`
+	CreatedAt time.Time
 }
 
 type CardRead struct {

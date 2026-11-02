@@ -115,15 +115,15 @@ func TestAccessDeniedForInactiveUser(t *testing.T) {
 	}
 }
 
-func TestAccessLenientMatch(t *testing.T) {
+func TestAccessUIDFormattingIsSignificant(t *testing.T) {
 	f := newAccessFixture(t)
 	u := seedUser(t, f.store, "u@example.com", "pw", false)
-	// Stored with colons + lowercase; read reports no colons + uppercase.
 	seedCard(t, f.store, u.ID, "aa:bb:cc:dd", "")
 
+	// Uppercasing is allowed, but removing separators is no longer equivalent.
 	f.sendCardRead(t, `{"cards":[{"cardID":"AABBCCDD"}],"id":1,"timestamp":0}`)
-	if got := waitFor(t, f.door); got != "open 1" {
-		t.Fatalf("doorControl = %q, want %q", got, "open 1")
+	if got := waitFor(t, f.door); got != "deny 1" {
+		t.Fatalf("doorControl = %q, want %q", got, "deny 1")
 	}
 }
 
@@ -173,8 +173,8 @@ func TestPairingHappyPath(t *testing.T) {
 		return f.access.PairingStatusFor(u.ID).State == PairingPaired
 	})
 	cards, _ := f.store.CardsByUser(u.ID)
-	if len(cards) != 1 || cards[0].CardUID != "aa:bb:cc:dd:ee:ff:00:00" {
-		t.Fatalf("card not stored in colon-hex form: %+v", cards)
+	if len(cards) != 1 || cards[0].CardUID != "AA:BB:CC:DD:EE:FF:00:00" {
+		t.Fatalf("card not stored in uppercase colon-hex form: %+v", cards)
 	}
 	if cards[0].Label != "" {
 		t.Errorf("paired card should have empty label, got %q", cards[0].Label)
@@ -207,8 +207,9 @@ func TestPairingDuplicateCard(t *testing.T) {
 	f.access.StartPairing(u.ID)
 	waitFor(t, f.cmd) // alternativeColorOn
 
-	// Swipe the already-registered card (different formatting).
-	f.sendCardRead(t, `{"cards":[{"cardID":"AABBCCDD"}],"id":8,"timestamp":0}`)
+	// Swipe the already-registered card with different casing, but the same
+	// colon-separated formatting.
+	f.sendCardRead(t, `{"cards":[{"cardID":"AA:BB:CC:DD"}],"id":8,"timestamp":0}`)
 	if got := waitFor(t, f.door); got != "ignore 8" {
 		t.Fatalf("doorControl = %q, want %q", got, "ignore 8")
 	}
