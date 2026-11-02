@@ -1,0 +1,41 @@
+{{define "user-list"}}
+<div id="user-list">
+  {{if .Error}}<p style="color: var(--pico-del-color);">{{.Error}}</p>{{end}}
+  <table>
+    <thead>
+      <tr><th>Email</th><th>Role</th><th>Status</th><th></th></tr>
+    </thead>
+    <tbody>
+      {{range .Users}}{{template "user-row" .}}{{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{define "user-row"}}
+<tr id="user-{{.ID}}">
+  <td>{{.Email}}</td>
+  <td>{{if .Admin}}Admin{{else}}User{{end}}</td>
+  <td>
+    {{if .Active}}
+      <ins>Active</ins>
+    {{else}}
+      <del>Inactive</del>
+    {{end}}
+  </td>
+  <td>
+    {{if .Active}}
+      <button class="secondary outline"
+              hx-post="/htmx/admin/users/{{.ID}}/deactivate"
+              hx-target="#user-{{.ID}}"
+              hx-swap="outerHTML"
+              hx-confirm="Deactivate {{.Email}}? This logs them out immediately.">Deactivate</button>
+    {{else}}
+      <button class="outline"
+              hx-post="/htmx/admin/users/{{.ID}}/activate"
+              hx-target="#user-{{.ID}}"
+              hx-swap="outerHTML">Activate</button>
+    {{end}}
+  </td>
+</tr>
+{{end}}

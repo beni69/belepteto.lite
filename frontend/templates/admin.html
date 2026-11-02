@@ -5,5 +5,25 @@
   <p>Manage users and review access.</p>
 </hgroup>
 
-<p>TODO</p>
+<article>
+  <header>Register a user</header>
+  <form hx-post="/htmx/admin/users" hx-target="#user-list" hx-swap="outerHTML"
+        hx-on::after-request="if(event.detail.successful) this.reset()">
+    <div class="grid">
+      <input type="email" name="email" placeholder="Email" autocomplete="off" required>
+      <input type="password" name="password" placeholder="Initial password" autocomplete="new-password" required>
+    </div>
+    <fieldset>
+      <label>
+        <input type="checkbox" name="admin" role="switch">
+        Grant admin privileges
+      </label>
+    </fieldset>
+    <button type="submit">Register user</button>
+  </form>
+</article>
+
+<div id="user-list" hx-get="/htmx/admin/users" hx-trigger="load">
+  <p aria-busy="true">Loading users…</p>
+</div>
 {{end}}

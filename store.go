@@ -10,7 +10,10 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-var ErrNotFound = errors.New("not found")
+var (
+	ErrNotFound  = errors.New("not found")
+	ErrDuplicate = errors.New("already exists")
+)
 
 type Store struct {
 	db *gorm.DB
@@ -18,7 +21,8 @@ type Store struct {
 
 func OpenStore(dsn string) (*Store, error) {
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
+		Logger:         logger.Default.LogMode(logger.Silent),
+		TranslateError: true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
@@ -32,7 +36,24 @@ func OpenStore(dsn string) (*Store, error) {
 }
 
 func (s *Store) CreateUser(u *User) error {
-	return s.db.Create(u).Error
+	err := s.db.Create(u).Error
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return ErrDuplicate
+	}
+	return err
+}
+
+// SetUserActive toggles a user's active flag. When deactivating, the caller is
+// responsible for clearing the user's sessions.
+func (s *Store) SetUserActive(id uint, active bool) error {
+	res := s.db.Model(&User{}).Where("id = ?", id).Update("active", active)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) UserByEmail(email string) (*User, error) {

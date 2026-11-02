@@ -77,3 +77,21 @@ func TestCardUIDUnique(t *testing.T) {
 		t.Fatal("expected duplicate card_uid to be rejected")
 	}
 }
+
+func TestCreateUserDuplicateEmail(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.CreateUser(&User{Email: "dup@example.com", PasswordHash: "h", Active: true}); err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+	err := store.CreateUser(&User{Email: "dup@example.com", PasswordHash: "h", Active: true})
+	if !errors.Is(err, ErrDuplicate) {
+		t.Fatalf("want ErrDuplicate, got %v", err)
+	}
+}
+
+func TestSetUserActiveNotFound(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SetUserActive(9999, false); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}

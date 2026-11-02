@@ -45,6 +45,11 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store) http.Handler 
 		r.Group(func(r chi.Router) {
 			r.Use(s.RequireAdmin)
 			r.Get("/admin", s.handleAdmin)
+
+			r.Get("/htmx/admin/users", s.handleAdminUserList)
+			r.Post("/htmx/admin/users", s.handleAdminUserCreate)
+			r.Post("/htmx/admin/users/{id}/activate", s.handleAdminUserActivate)
+			r.Post("/htmx/admin/users/{id}/deactivate", s.handleAdminUserDeactivate)
 		})
 	})
 
