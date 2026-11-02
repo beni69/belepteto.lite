@@ -55,29 +55,47 @@ func TestStaticAssets(t *testing.T) {
 	}
 }
 
-func TestPagesRender(t *testing.T) {
+func TestLoginPageRenders(t *testing.T) {
 	srv := newTestServer(t)
-
-	cases := []struct {
-		path string
-		want string
-	}{
-		{"/", "My cards"},
-		{"/login", "Log in to continue"},
-		{"/admin", "Manage users"},
+	resp, err := http.Get(srv.URL + "/login")
+	if err != nil {
+		t.Fatalf("GET /login: %v", err)
 	}
-	for _, tc := range cases {
-		resp, err := http.Get(srv.URL + tc.path)
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("status = %d, want 200", resp.StatusCode)
+	}
+	if !strings.Contains(string(body), "Log in to continue") {
+		t.Errorf("login page missing expected content")
+	}
+}
+
+// noRedirectClient refuses to follow redirects so tests can assert on the 303
+// itself rather than the redirect target.
+func noRedirectClient() *http.Client {
+	return &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+}
+
+func TestGatedPagesRedirectWhenLoggedOut(t *testing.T) {
+	srv := newTestServer(t)
+	client := noRedirectClient()
+
+	for _, path := range []string{"/", "/admin"} {
+		resp, err := client.Get(srv.URL + path)
 		if err != nil {
-			t.Fatalf("GET %s: %v", tc.path, err)
+			t.Fatalf("GET %s: %v", path, err)
 		}
-		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("GET %s: status = %d, want 200", tc.path, resp.StatusCode)
+		if resp.StatusCode != http.StatusSeeOther {
+			t.Errorf("GET %s: status = %d, want 303", path, resp.StatusCode)
 		}
-		if !strings.Contains(string(body), tc.want) {
-			t.Errorf("GET %s: body missing %q", tc.path, tc.want)
+		if loc := resp.Header.Get("Location"); loc != "/login" {
+			t.Errorf("GET %s: redirect to %q, want /login", path, loc)
 		}
 	}
 }

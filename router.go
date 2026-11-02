@@ -32,24 +32,33 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store) http.Handler 
 	staticFS, _ := fs.Sub(frontend.FS, "static")
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
-	// frontend pages
-	r.Get("/", s.handleHome)
+	// Public auth routes.
 	r.Get("/login", s.handleLoginPage)
-	r.Get("/admin", s.handleAdmin)
+	r.Post("/login", s.handleLoginSubmit)
+	r.Post("/logout", s.handleLogout)
+
+	// Authenticated pages.
+	r.Group(func(r chi.Router) {
+		r.Use(s.RequireAuth)
+		r.Get("/", s.handleHome)
+
+		r.Group(func(r chi.Router) {
+			r.Use(s.RequireAdmin)
+			r.Get("/admin", s.handleAdmin)
+		})
+	})
 
 	return r
 }
 
 func (s *server) handleHome(w http.ResponseWriter, r *http.Request) {
-	s.render(w, "home", map[string]any{"IsAdmin": true})
+	u := userFromContext(r.Context())
+	s.render(w, "home", map[string]any{"IsAdmin": u.Admin})
 }
 
 func (s *server) handleAdmin(w http.ResponseWriter, r *http.Request) {
-	s.render(w, "admin", map[string]any{"IsAdmin": true})
-}
-
-func (s *server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
-	s.render(w, "login", map[string]any{})
+	u := userFromContext(r.Context())
+	s.render(w, "admin", map[string]any{"IsAdmin": u.Admin})
 }
 
 func (s *server) render(w http.ResponseWriter, name string, data any) {

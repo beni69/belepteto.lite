@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -12,14 +14,18 @@ import (
 )
 
 type config struct {
-	httpAddr string
-	dbPath   string
+	httpAddr      string
+	dbPath        string
+	adminEmail    string
+	adminPassword string
 }
 
 func loadConfig() config {
 	return config{
-		httpAddr: envOr("BELEPTETO_HTTP_ADDR", ":8080"),
-		dbPath:   envOr("BELEPTETO_DB_PATH", "belepteto.db"),
+		httpAddr:      envOr("BELEPTETO_HTTP_ADDR", ":8080"),
+		dbPath:        envOr("BELEPTETO_DB_PATH", "belepteto.db"),
+		adminEmail:    envOr("BELEPTETO_ADMIN_EMAIL", "admin@example.com"),
+		adminPassword: os.Getenv("BELEPTETO_ADMIN_PASSWORD"),
 	}
 }
 
@@ -28,6 +34,34 @@ func envOr(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// seedAdmin creates the first admin user when the database is empty. If no
+// password was supplied via env, a random one is generated and logged once so
+// the operator can log in.
+func seedAdmin(logger *slog.Logger, store *Store, cfg config) error {
+	password := cfg.adminPassword
+	generated := false
+	if password == "" {
+		b := make([]byte, 18)
+		if _, err := rand.Read(b); err != nil {
+			return err
+		}
+		password = base64.RawURLEncoding.EncodeToString(b)
+		generated = true
+	}
+
+	created, err := store.SeedAdmin(cfg.adminEmail, password)
+	if err != nil {
+		return err
+	}
+	if created && generated {
+		logger.Warn("seeded initial admin user — save this password, it is shown only once",
+			"email", cfg.adminEmail, "password", password)
+	} else if created {
+		logger.Info("seeded initial admin user", "email", cfg.adminEmail)
+	}
+	return nil
 }
 
 func main() {
@@ -46,6 +80,10 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	logger.Info("database ready", "path", cfg.dbPath)
+
+	if err := seedAdmin(logger, store, cfg); err != nil {
+		return err
+	}
 
 	tmpl, err := LoadTemplates()
 	if err != nil {
