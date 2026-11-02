@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 )
@@ -11,13 +12,13 @@ import (
 type PairingState string
 
 const (
-	PairingIdle     PairingState = "idle"
-	PairingWaiting  PairingState = "waiting"
-	PairingPaired   PairingState = "paired"
-	PairingTimeout  PairingState = "timeout"
+	PairingIdle      PairingState = "idle"
+	PairingWaiting   PairingState = "waiting"
+	PairingPaired    PairingState = "paired"
+	PairingTimeout   PairingState = "timeout"
 	PairingDuplicate PairingState = "duplicate"
-	PairingBusy     PairingState = "busy"
-	PairingError    PairingState = "error"
+	PairingBusy      PairingState = "busy"
+	PairingError     PairingState = "error"
 )
 
 // PairingStatus is what the frontend poll endpoint reads.
@@ -146,6 +147,11 @@ func (a *AccessService) onCardRead(_ string, payload []byte) {
 		a.logger.Warn("cardRead with no cards", "id", msg.ID)
 		return
 	}
+	for i := range msg.Cards {
+		// Preserve the reader's separators and only uppercase the UID for the
+		// database lookup and log records.
+		msg.Cards[i].CardID = strings.ToUpper(msg.Cards[i].CardID)
+	}
 
 	// Decide whether this read is a pairing attempt or a normal access attempt.
 	a.mu.Lock()
@@ -220,7 +226,7 @@ func (a *AccessService) handlePairingRead(userID uint, msg CardReadMsg) {
 		a.endPairing()
 	}()
 
-	exists, err := a.store.CardExistsByCanonical(uid)
+	exists, err := a.store.CardExistsByUID(uid)
 	if err != nil {
 		a.logger.Error("pairing duplicate check", "err", err)
 		a.setResult(userID, PairingStatus{State: PairingError, Message: "Could not complete pairing. Try again."})

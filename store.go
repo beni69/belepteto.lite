@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/glebarez/sqlite"
@@ -19,6 +20,8 @@ type Store struct {
 	db *gorm.DB
 }
 
+const legacyCardUIDCanonicalColumn = "card_uid_canonical"
+
 func OpenStore(dsn string) (*Store, error) {
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger:         logger.Default.LogMode(logger.Silent),
@@ -28,11 +31,36 @@ func OpenStore(dsn string) (*Store, error) {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
+	if err := migrateCardUID(db); err != nil {
+		return nil, fmt.Errorf("migrate card UID schema: %w", err)
+	}
 	if err := db.AutoMigrate(&User{}, &Session{}, &Card{}, &CardRead{}, &Entry{}); err != nil {
 		return nil, fmt.Errorf("migrate schema: %w", err)
 	}
 
 	return &Store{db: db}, nil
+}
+
+// migrateCardUID removes the old derived UID column from databases created by
+// earlier versions. The old CardUID value is retained and upper-cased only;
+// separators and whitespace are intentionally left unchanged.
+func migrateCardUID(db *gorm.DB) error {
+	migrator := db.Migrator()
+	if !migrator.HasTable(&Card{}) || !migrator.HasColumn(&Card{}, legacyCardUIDCanonicalColumn) {
+		return nil
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&Card{}).
+			Where("card_uid IS NOT NULL").
+			UpdateColumn("card_uid", gorm.Expr("UPPER(card_uid)")).Error; err != nil {
+			return fmt.Errorf("uppercase existing card UIDs: %w", err)
+		}
+		if err := tx.Migrator().DropColumn(&Card{}, legacyCardUIDCanonicalColumn); err != nil {
+			return fmt.Errorf("drop %s: %w", legacyCardUIDCanonicalColumn, err)
+		}
+		return nil
+	})
 }
 
 func (s *Store) CreateUser(u *User) error {
@@ -92,10 +120,10 @@ func (s *Store) CardsByUser(userID uint) ([]Card, error) {
 	return cards, err
 }
 
-// CreateCard inserts a card. The canonical UID is derived from CardUID so the
-// caller only needs to set the colon-hex CardUID, label, user, and active flag.
+// CreateCard inserts a card. Card UIDs are stored in uppercase while retaining
+// the reader-provided separators and formatting.
 func (s *Store) CreateCard(c *Card) error {
-	c.CardUIDCanonical = CanonicalCardUID(c.CardUID)
+	c.CardUID = strings.ToUpper(c.CardUID)
 	err := s.db.Create(c).Error
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return ErrDuplicate
@@ -103,22 +131,22 @@ func (s *Store) CreateCard(c *Card) error {
 	return err
 }
 
-// CardExistsByCanonical reports whether any card matches the given UID under
-// lenient (canonical) comparison.
-func (s *Store) CardExistsByCanonical(uid string) (bool, error) {
+// CardExistsByUID reports whether any card has the given UID after uppercasing.
+// No separators or other formatting are removed.
+func (s *Store) CardExistsByUID(uid string) (bool, error) {
 	var n int64
 	err := s.db.Model(&Card{}).
-		Where("card_uid_canonical = ?", CanonicalCardUID(uid)).
+		Where("card_uid = ?", strings.ToUpper(uid)).
 		Count(&n).Error
 	return n > 0, err
 }
 
 // ActiveCardOwner returns the active user who owns an active card matching the
-// given UID (lenient). Returns ErrNotFound if there is no match, the card is
-// inactive, or the owner is inactive.
+// given UID after uppercasing. Returns ErrNotFound if there is no match, the
+// card is inactive, or the owner is inactive.
 func (s *Store) ActiveCardOwner(uid string) (*Card, *User, error) {
 	var c Card
-	err := s.db.Where("card_uid_canonical = ? AND active = ?", CanonicalCardUID(uid), true).
+	err := s.db.Where("card_uid = ? AND active = ?", strings.ToUpper(uid), true).
 		First(&c).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil, ErrNotFound

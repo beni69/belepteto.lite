@@ -23,7 +23,7 @@ func TestCreateAndReadUserWithCard(t *testing.T) {
 		Admin:        true,
 		Active:       true,
 		Cards: []Card{
-			{CardUID: "DEADBEEF", CardUIDCanonical: "DEADBEEF", Label: "keychain", Active: true},
+			{CardUID: "DE:AD:BE:EF", Label: "keychain", Active: true},
 		},
 	}
 	if err := store.CreateUser(u); err != nil {
@@ -45,7 +45,7 @@ func TestCreateAndReadUserWithCard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CardsByUser: %v", err)
 	}
-	if len(cards) != 1 || cards[0].CardUID != "DEADBEEF" {
+	if len(cards) != 1 || cards[0].CardUID != "DE:AD:BE:EF" {
 		t.Fatalf("unexpected cards: %+v", cards)
 	}
 }
@@ -73,9 +73,9 @@ func TestCardUIDUnique(t *testing.T) {
 	if err := store.CreateCard(&Card{UserID: u1.ID, CardUID: "aa:bb:cc:dd", Active: true}); err != nil {
 		t.Fatalf("first card: %v", err)
 	}
-	// Same card in different formatting/casing must be rejected (lenient match).
-	if err := store.CreateCard(&Card{UserID: u2.ID, CardUID: "AABBCCDD", Active: true}); err != ErrDuplicate {
-		t.Fatalf("expected ErrDuplicate for lenient-equal UID, got %v", err)
+	// The same UID with different casing must be rejected after uppercasing.
+	if err := store.CreateCard(&Card{UserID: u2.ID, CardUID: "AA:BB:CC:DD", Active: true}); err != ErrDuplicate {
+		t.Fatalf("expected ErrDuplicate for the same UID, got %v", err)
 	}
 }
 

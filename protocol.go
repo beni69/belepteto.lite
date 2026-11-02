@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"math"
-	"strings"
 	"time"
 )
 
@@ -18,16 +17,16 @@ func NewControllerTopics(id string) ControllerTopics {
 	return ControllerTopics{id: id}
 }
 
-func (c ControllerTopics) base() string         { return "controller/" + c.id }
-func (c ControllerTopics) CardRead() string      { return c.base() + "/cardRead" }
-func (c ControllerTopics) DoorControl() string   { return c.base() + "/doorControl" }
-func (c ControllerTopics) Command() string       { return c.base() + "/command" }
-func (c ControllerTopics) DBControl() string     { return c.base() + "/dbControl" }
-func (c ControllerTopics) DBPush() string        { return c.base() + "/dbPush" }
-func (c ControllerTopics) Entries() string       { return c.base() + "/entries" }
-func (c ControllerTopics) Heartbeat() string     { return c.base() + "/heartbeat" }
-func (c ControllerTopics) Syslog() string        { return c.base() + "/syslog" }
-func (c ControllerTopics) DoorState() string     { return c.base() + "/doorState" }
+func (c ControllerTopics) base() string        { return "controller/" + c.id }
+func (c ControllerTopics) CardRead() string    { return c.base() + "/cardRead" }
+func (c ControllerTopics) DoorControl() string { return c.base() + "/doorControl" }
+func (c ControllerTopics) Command() string     { return c.base() + "/command" }
+func (c ControllerTopics) DBControl() string   { return c.base() + "/dbControl" }
+func (c ControllerTopics) DBPush() string      { return c.base() + "/dbPush" }
+func (c ControllerTopics) Entries() string     { return c.base() + "/entries" }
+func (c ControllerTopics) Heartbeat() string   { return c.base() + "/heartbeat" }
+func (c ControllerTopics) Syslog() string      { return c.base() + "/syslog" }
+func (c ControllerTopics) DoorState() string   { return c.base() + "/doorState" }
 
 // BackendHealthcheck is a fixed topic, not under controller/{id}.
 const BackendHealthcheck = "backend/healthcheck"
@@ -86,9 +85,9 @@ type DoorStateMsg struct {
 
 // DoorControl commands.
 const (
-	DoorOpen   = "open"
-	DoorDeny   = "deny"
-	DoorIgnore = "ignore"
+	DoorOpen    = "open"
+	DoorDeny    = "deny"
+	DoorIgnore  = "ignore"
 	DoorCustom1 = "custom1"
 	DoorCustom2 = "custom2"
 )
@@ -120,21 +119,6 @@ const (
 	HealthcheckUp   = "true"
 	HealthcheckDown = "false"
 )
-
-// CanonicalCardUID produces the lenient match key for a card UID: colons and
-// whitespace removed, upper-cased. The reader sends colon-hex like
-// "aa:bb:cc:dd:00:00:00:00"; users may store the same card in any casing, so
-// matching compares canonical forms.
-func CanonicalCardUID(uid string) string {
-	var b strings.Builder
-	for _, r := range uid {
-		if r == ':' || r == ' ' || r == '\t' || r == '\n' || r == '\r' {
-			continue
-		}
-		b.WriteRune(r)
-	}
-	return strings.ToUpper(b.String())
-}
 
 // EventTime converts a spec timestamp to a time.Time. Per the spec, a timestamp
 // of 0 means "use the time the message was received", so callers pass the
