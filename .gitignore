@@ -1,0 +1,9 @@
+/bin/
+belepteto
+.env
+
+# sqlite
+*.db
+*.db-shm
+*.db-wal
+data.db
