@@ -21,6 +21,7 @@ type config struct {
 	adminPassword string
 	mqttAddr      string
 	controllerID  string
+	sso           ssoConfig
 }
 
 func loadConfig() config {
@@ -31,6 +32,16 @@ func loadConfig() config {
 		adminPassword: os.Getenv("BELEPTETO_ADMIN_PASSWORD"),
 		mqttAddr:      envOr("BELEPTETO_MQTT_ADDR", ":1883"),
 		controllerID:  envOr("BELEPTETO_CONTROLLER_ID", "1619"),
+		sso: ssoConfig{
+			issuerURL:       os.Getenv("ISSUER_URL"),
+			wellKnownURL:    os.Getenv("WELL_KNOWN_URL"),
+			clientID:        os.Getenv("CLIENT_ID"),
+			clientSecret:    os.Getenv("CLIENT_SECRET"),
+			scopes:          os.Getenv("SCOPES"),
+			redirectURL:     os.Getenv("SSO_REDIRECT_URL"),
+			frontendURL:     os.Getenv("SSO_FRONTEND_URL"),
+			loginButtonText: envOr("LOGIN_BUTTON_TEXT", defaultSSOLoginButtonText),
+		},
 	}
 }
 
@@ -95,6 +106,11 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
+	sso, err := newOIDCAuthenticator(context.Background(), cfg.sso, nil)
+	if err != nil {
+		return fmt.Errorf("configure OIDC SSO: %w", err)
+	}
+
 	broker, err := NewBroker(logger, cfg.mqttAddr)
 	if err != nil {
 		return err
@@ -112,7 +128,7 @@ func run(logger *slog.Logger) error {
 
 	srv := &http.Server{
 		Addr:              cfg.httpAddr,
-		Handler:           newRouter(logger, tmpl, store, access),
+		Handler:           newRouter(logger, tmpl, store, access, sso),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

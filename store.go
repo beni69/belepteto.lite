@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/glebarez/sqlite"
@@ -11,8 +12,10 @@ import (
 )
 
 var (
-	ErrNotFound  = errors.New("not found")
-	ErrDuplicate = errors.New("already exists")
+	ErrNotFound             = errors.New("not found")
+	ErrDuplicate            = errors.New("already exists")
+	ErrOIDCIdentityConflict = errors.New("OIDC identity is already linked to another account")
+	ErrAmbiguousEmail       = errors.New("email matches multiple local accounts")
 )
 
 type Store struct {
@@ -66,6 +69,93 @@ func (s *Store) UserByEmail(email string) (*User, error) {
 		return nil, err
 	}
 	return &u, nil
+}
+
+// UserByOIDCIdentity finds a user by the issuer-scoped OIDC subject.
+func (s *Store) UserByOIDCIdentity(issuer, subject string) (*User, error) {
+	var u User
+	err := s.db.Where("oidc_issuer = ? AND oidc_subject = ?", issuer, subject).First(&u).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+// LinkOIDCIdentity attaches a verified OIDC identity to an existing active
+// local user. It never creates local accounts and will not overwrite an
+// identity that has already been linked.
+func (s *Store) LinkOIDCIdentity(issuer, subject, email string) (*User, error) {
+	email = strings.TrimSpace(email)
+	if strings.TrimSpace(issuer) == "" || strings.TrimSpace(subject) == "" || email == "" {
+		return nil, ErrNotFound
+	}
+
+	var linked User
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// A concurrent callback may have linked this identity since the caller's
+		// initial lookup. Resolve that identity before attempting an email link.
+		var existing User
+		err := tx.Where("oidc_issuer = ? AND oidc_subject = ?", issuer, subject).First(&existing).Error
+		if err == nil {
+			linked = existing
+			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		var matches []User
+		if err := tx.Where("LOWER(email) = LOWER(?)", email).Limit(2).Find(&matches).Error; err != nil {
+			return err
+		}
+		if len(matches) == 0 {
+			return ErrNotFound
+		}
+		if len(matches) > 1 {
+			return ErrAmbiguousEmail
+		}
+
+		user := matches[0]
+		if !user.Active {
+			return ErrNotFound
+		}
+		if user.OIDCIssuer != nil || user.OIDCSubject != nil {
+			return ErrOIDCIdentityConflict
+		}
+
+		res := tx.Model(&User{}).
+			Where("id = ? AND oidc_issuer IS NULL AND oidc_subject IS NULL", user.ID).
+			Updates(map[string]any{"oidc_issuer": issuer, "oidc_subject": subject})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected != 1 {
+			return ErrOIDCIdentityConflict
+		}
+		user.OIDCIssuer = &issuer
+		user.OIDCSubject = &subject
+		linked = user
+		return nil
+	})
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		// A simultaneous login can win the unique issuer/subject index. Accept
+		// that result only if it resolved to an active user.
+		user, lookupErr := s.UserByOIDCIdentity(issuer, subject)
+		if lookupErr == nil && user.Active {
+			return user, nil
+		}
+		return nil, ErrOIDCIdentityConflict
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !linked.Active {
+		return nil, ErrNotFound
+	}
+	return &linked, nil
 }
 
 func (s *Store) UserByID(id uint) (*User, error) {

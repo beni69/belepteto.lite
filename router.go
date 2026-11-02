@@ -16,10 +16,15 @@ type server struct {
 	tmpl   *Templates
 	store  *Store
 	access *AccessService
+	sso    *oidcAuthenticator
 }
 
-func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *AccessService) http.Handler {
-	s := &server{logger: logger, tmpl: tmpl, store: store, access: access}
+func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *AccessService, sso ...*oidcAuthenticator) http.Handler {
+	var oidcAuth *oidcAuthenticator
+	if len(sso) > 0 {
+		oidcAuth = sso[0]
+	}
+	s := &server{logger: logger, tmpl: tmpl, store: store, access: access, sso: oidcAuth}
 
 	r := chi.NewRouter()
 
@@ -37,6 +42,10 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *Acces
 	r.Get("/login", s.handleLoginPage)
 	r.Post("/login", s.handleLoginSubmit)
 	r.Post("/logout", s.handleLogout)
+	if s.sso != nil {
+		r.Get("/sso/login", s.handleOIDCLogin)
+		r.Get(s.sso.callbackPath, s.handleOIDCCallback)
+	}
 
 	// Authenticated pages.
 	r.Group(func(r chi.Router) {

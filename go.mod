@@ -3,18 +3,21 @@ module git.sch.bme.hu/vben/belepteto.lite
 go 1.26.10
 
 require (
+	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/eclipse/paho.mqtt.golang v1.5.1
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/google/uuid v1.6.0
 	github.com/mochi-mqtt/server/v2 v2.7.9
 	golang.org/x/crypto v0.58.0
+	golang.org/x/oauth2 v0.36.0
 	gorm.io/gorm v1.31.2
 )
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/glebarez/go-sqlite v1.21.2 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
