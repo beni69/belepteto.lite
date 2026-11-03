@@ -1,32 +1,40 @@
 {{define "access-grant-list"}}
-<div id="access-grant-list">
-  {{if .Error}}<p style="color: var(--pico-del-color);">{{.Error}}</p>{{end}}
+<div id="access-grant-list" class="grant-list-region">
+  <h3 class="subsection-heading grant-list-heading">
+    <span class="subsection-icon"><svg class="icon" aria-hidden="true"><use href="#icon-calendar"></use></svg></span>
+    Current and upcoming times
+  </h3>
+  {{if .Error}}<p class="notice-error" role="alert">{{.Error}}</p>{{end}}
   {{if .Grants}}
-    <table>
-      <thead>
-        <tr><th>Person</th><th>Starts</th><th>Ends</th><th>Status</th><th>Added by</th><th></th></tr>
-      </thead>
-      <tbody>
-        {{range .Grants}}
-          <tr>
-            <td>{{.Email}}</td>
-            <td>{{.FromDisplay}}</td>
-            <td>{{.UntilDisplay}}</td>
-            <td>{{.Status}}</td>
-            <td>{{.SourceLabel}}</td>
-            <td>
-              <button class="secondary outline"
-                      hx-post="/htmx/admin/access-grants/{{.ID}}/revoke"
-                      hx-target="#access-grant-list"
-                      hx-swap="outerHTML"
-                      hx-confirm="Remove this entry time?{{if .External}} A future update from the connected system may add it again.{{end}}">Remove</button>
-            </td>
-          </tr>
-        {{end}}
-      </tbody>
-    </table>
-  {{else}}
-    <p>No current or upcoming entry times.</p>
+    <ul class="grant-list">
+      {{range .Grants}}
+        <li class="grant-item">
+          <div class="grant-identity">
+            <span class="record-icon"><svg class="icon" aria-hidden="true"><use href="#icon-user"></use></svg></span>
+            <div class="grant-person">
+              <h4>{{.Email}}</h4>
+              <span class="status-pill status-info"><svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg>{{.Status}}</span>
+            </div>
+          </div>
+          <dl class="grant-details">
+            <div><dt>Starts</dt><dd>{{.FromDisplay}}</dd></div>
+            <div><dt>Ends</dt><dd>{{.UntilDisplay}}</dd></div>
+          </dl>
+          <div class="grant-actions">
+            <span class="grant-source">Added by {{.SourceLabel}}</span>
+            <button type="button" class="secondary outline button-danger button-with-icon button-compact"
+                    hx-post="/htmx/admin/access-grants/{{.ID}}/revoke"
+                    hx-target="#access-grant-list"
+                    hx-swap="outerHTML"
+                    hx-confirm="Remove this entry time?{{if .External}} A future update from the connected system may add it again.{{end}}">
+              <svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg><span>Remove time</span>
+            </button>
+          </div>
+        </li>
+      {{end}}
+    </ul>
+  {{else if not .Error}}
+    <p class="empty-state"><svg class="icon" aria-hidden="true"><use href="#icon-calendar"></use></svg>No current or upcoming entry times.</p>
   {{end}}
 </div>
 {{end}}

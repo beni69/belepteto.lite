@@ -1,23 +1,32 @@
 {{define "entry-log"}}
-<div id="entry-log">
+<div id="entry-log" class="log-region">
   {{if .Rows}}
-  <table>
-    <thead>
-      <tr><th>Time</th><th>User</th><th>Card UID prefix</th></tr>
-    </thead>
-    <tbody>
+    <div class="event-list-header entry-event-grid" aria-hidden="true">
+      <span>Time</span><span>User</span><span>Card UID prefix</span>
+    </div>
+    <ol class="event-list">
       {{range .Rows}}
-      <tr>
-        <td>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
-        <td>{{if .Email}}{{.Email}}{{else}}<i>unknown</i>{{end}}</td>
-        <td>{{if .CardUIDPrefix}}<code>{{.CardUIDPrefix}}</code>{{else}}<i>remote</i>{{end}}</td>
-      </tr>
+        <li class="event-item">
+          <dl class="event-row entry-event-grid">
+            <div class="event-field">
+              <dt>Time</dt>
+              <dd><time datetime="{{.CreatedAt.Format "2006-01-02T15:04:05Z07:00"}}">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</time></dd>
+            </div>
+            <div class="event-field">
+              <dt>User</dt>
+              <dd>{{if .Email}}{{.Email}}{{else}}<i>unknown</i>{{end}}</dd>
+            </div>
+            <div class="event-field">
+              <dt>Card UID prefix</dt>
+              <dd>{{if .CardUIDPrefix}}<code>{{.CardUIDPrefix}}</code>{{else}}<i>remote</i>{{end}}</dd>
+            </div>
+          </dl>
+        </li>
       {{end}}
-    </tbody>
-  </table>
-  {{template "pager" .}}
+    </ol>
+    {{template "pager" .}}
   {{else}}
-  <p>No entries yet.</p>
+    <p class="empty-state"><svg class="icon" aria-hidden="true"><use href="#icon-door"></use></svg>No entries yet.</p>
   {{end}}
 </div>
 {{end}}

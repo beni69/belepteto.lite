@@ -228,7 +228,7 @@ func (s *server) handleAdminCardReadLog(w http.ResponseWriter, r *http.Request) 
 }
 
 // renderUserList renders the whole user list fragment, optionally with an error
-// message shown above the table.
+// message shown above the list.
 func (s *server) renderUserList(w http.ResponseWriter, errMsg string) {
 	users, err := s.store.ListUsers()
 	if err != nil {

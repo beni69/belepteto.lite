@@ -1,32 +1,53 @@
 {{define "cardread-log"}}
-<div id="cardread-log">
-  <label>
-    <input type="checkbox" role="switch"
-           {{if .AcceptedOnly}}checked{{end}}
-           hx-get="/htmx/admin/logs/cardreads?accepted={{if .AcceptedOnly}}0{{else}}1{{end}}"
-           hx-target="#cardread-log" hx-swap="outerHTML">
-    Accepted reads only
-  </label>
+<div id="cardread-log" class="log-region">
+  <div class="filter-row">
+    <label class="toggle-row filter-toggle">
+      <input type="checkbox" role="switch"
+             {{if .AcceptedOnly}}checked{{end}}
+             hx-get="/htmx/admin/logs/cardreads?accepted={{if .AcceptedOnly}}0{{else}}1{{end}}"
+             hx-target="#cardread-log" hx-swap="outerHTML">
+      <svg class="icon" aria-hidden="true"><use href="#icon-filter"></use></svg>
+      <span>Accepted reads only</span>
+    </label>
+  </div>
 
   {{if .Rows}}
-  <table>
-    <thead>
-      <tr><th>Time</th><th>Card UID prefix</th><th>User</th><th>Result</th></tr>
-    </thead>
-    <tbody>
+    <div class="event-list-header cardread-event-grid" aria-hidden="true">
+      <span>Time</span><span>Card UID prefix</span><span>User</span><span>Result</span>
+    </div>
+    <ol class="event-list">
       {{range .Rows}}
-      <tr>
-        <td>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
-        <td><code>{{.CardUIDPrefix}}</code></td>
-        <td>{{if .Email}}{{.Email}}{{else}}<i>unknown</i>{{end}}</td>
-        <td>{{if .Accepted}}<ins>Accepted</ins>{{else}}<del>Denied</del>{{end}}</td>
-      </tr>
+        <li class="event-item">
+          <dl class="event-row cardread-event-grid">
+            <div class="event-field">
+              <dt>Time</dt>
+              <dd><time datetime="{{.CreatedAt.Format "2006-01-02T15:04:05Z07:00"}}">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</time></dd>
+            </div>
+            <div class="event-field">
+              <dt>Card UID prefix</dt>
+              <dd><code>{{.CardUIDPrefix}}</code></dd>
+            </div>
+            <div class="event-field">
+              <dt>User</dt>
+              <dd>{{if .Email}}{{.Email}}{{else}}<i>unknown</i>{{end}}</dd>
+            </div>
+            <div class="event-field">
+              <dt>Result</dt>
+              <dd>
+                {{if .Accepted}}
+                  <span class="status-pill status-positive"><svg class="icon" aria-hidden="true"><use href="#icon-check-circle"></use></svg>Accepted</span>
+                {{else}}
+                  <span class="status-pill status-negative"><svg class="icon" aria-hidden="true"><use href="#icon-x-circle"></use></svg>Denied</span>
+                {{end}}
+              </dd>
+            </div>
+          </dl>
+        </li>
       {{end}}
-    </tbody>
-  </table>
-  {{template "pager" .}}
+    </ol>
+    {{template "pager" .}}
   {{else}}
-  <p>No card reads{{if .AcceptedOnly}} accepted{{end}} yet.</p>
+    <p class="empty-state"><svg class="icon" aria-hidden="true"><use href="#icon-card"></use></svg>No card reads{{if .AcceptedOnly}} accepted{{end}} yet.</p>
   {{end}}
 </div>
 {{end}}

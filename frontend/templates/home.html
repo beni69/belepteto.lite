@@ -1,53 +1,66 @@
 {{define "title"}}Cards{{end}}
 {{define "content"}}
-<hgroup>
-  <h1>My cards</h1>
+<hgroup class="page-heading">
+  <h1><svg class="icon heading-icon" aria-hidden="true"><use href="#icon-card"></use></svg>My cards</h1>
   <p>Cards you assign here can open the door.</p>
 </hgroup>
 
-<article>
-  <header>Pair a card</header>
-  <p>Put the reader into pairing mode, then swipe the card you want to add.</p>
-  <div id="pair-area">
-    <button hx-post="/htmx/cards/pair" hx-target="#pair-area" hx-swap="innerHTML">
-      Pair a card
-    </button>
-  </div>
-</article>
-
-<div id="card-list" hx-get="/htmx/cards" hx-trigger="load">
-  <p aria-busy="true">Loading cards…</p>
-</div>
-
-<article>
-  <header>User</header>
-  <dl>
-    <dt>Email</dt>
-    <dd>{{.Account.Email}}</dd>
-    {{if .Account.SSOIssuer}}
-      <dt>SSO</dt>
-      <dd>{{.Account.SSOIssuer}}</dd>
-    {{end}}
-  </dl>
-
-  <h3>Change password</h3>
-  <form hx-post="/htmx/account/password" hx-target="#password-result" hx-swap="innerHTML">
-    <label>
-      Current password
-      <input type="password" name="current_password" autocomplete="current-password" required>
-    </label>
-    <div class="grid">
-      <label>
-        New password
-        <input type="password" name="new_password" autocomplete="new-password" required>
-      </label>
-      <label>
-        Confirm new password
-        <input type="password" name="confirm_password" autocomplete="new-password" required>
-      </label>
+<div class="content-stack">
+  <article class="panel">
+    <header class="panel-header">
+      <span class="panel-header-icon"><svg class="icon" aria-hidden="true"><use href="#icon-card-plus"></use></svg></span>
+      <h2>Pair a card</h2>
+    </header>
+    <p>Put the reader into pairing mode, then swipe the card you want to add.</p>
+    <div id="pair-area" class="pair-area">
+      <button class="button-with-icon" hx-post="/htmx/cards/pair" hx-target="#pair-area" hx-swap="outerHTML">
+        <svg class="icon" aria-hidden="true"><use href="#icon-card-plus"></use></svg><span>Pair a card</span>
+      </button>
     </div>
-    <button type="submit">Change password</button>
-  </form>
-  <div id="password-result" aria-live="polite"></div>
-</article>
+  </article>
+
+  <section id="card-list" class="panel card-list-panel" hx-get="/htmx/cards" hx-trigger="load" hx-swap="outerHTML">
+    <header class="panel-header">
+      <span class="panel-header-icon"><svg class="icon" aria-hidden="true"><use href="#icon-card"></use></svg></span>
+      <h2>Your cards</h2>
+    </header>
+    <p class="loading-state" aria-busy="true"><svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg>Loading cards…</p>
+  </section>
+
+  <article class="panel account-panel">
+    <header class="panel-header">
+      <span class="panel-header-icon"><svg class="icon" aria-hidden="true"><use href="#icon-user"></use></svg></span>
+      <h2>Account</h2>
+    </header>
+    <dl class="account-details">
+      <div><dt>Email</dt><dd>{{.Account.Email}}</dd></div>
+      {{if .Account.SSOIssuer}}
+        <div><dt>SSO</dt><dd>{{.Account.SSOIssuer}}</dd></div>
+      {{end}}
+    </dl>
+
+    <div class="subsection-heading">
+      <span class="subsection-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></span>
+      <h3>Change password</h3>
+    </div>
+    <form class="form-stack" hx-post="/htmx/account/password" hx-target="#password-result" hx-swap="innerHTML">
+      <label>
+        Current password
+        <input type="password" name="current_password" autocomplete="current-password" required>
+      </label>
+      <div class="form-grid form-grid-two">
+        <label>
+          New password
+          <input type="password" name="new_password" autocomplete="new-password" required>
+        </label>
+        <label>
+          Confirm new password
+          <input type="password" name="confirm_password" autocomplete="new-password" required>
+        </label>
+      </div>
+      <button type="submit" class="button-with-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg><span>Change password</span></button>
+    </form>
+    <div id="password-result" aria-live="polite"></div>
+  </article>
+</div>
 {{end}}

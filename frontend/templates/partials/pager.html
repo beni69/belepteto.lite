@@ -1,19 +1,27 @@
 {{define "pager"}}
-<nav>
+<nav class="pager" aria-label="Log pages">
   <ul>
     <li>
       {{if .HasPrev}}
-      <button class="outline" hx-get="{{.BaseURL}}?{{.PrevQuery}}" hx-target="#{{.TargetID}}" hx-swap="outerHTML">&larr; Prev</button>
+        <button type="button" class="secondary outline button-with-icon" aria-label="Previous page" hx-get="{{.BaseURL}}?{{.PrevQuery}}" hx-target="#{{.TargetID}}" hx-swap="outerHTML">
+          <svg class="icon" aria-hidden="true"><use href="#icon-arrow-left"></use></svg><span class="pager-label">Previous</span>
+        </button>
       {{else}}
-      <button class="outline" disabled>&larr; Prev</button>
+        <button type="button" class="secondary outline button-with-icon" aria-label="Previous page" disabled>
+          <svg class="icon" aria-hidden="true"><use href="#icon-arrow-left"></use></svg><span class="pager-label">Previous</span>
+        </button>
       {{end}}
     </li>
-    <li><small>Page {{.Page}} of {{.TotalPages}}</small></li>
+    <li><span class="pager-count">Page {{.Page}} of {{.TotalPages}}</span></li>
     <li>
       {{if .HasNext}}
-      <button class="outline" hx-get="{{.BaseURL}}?{{.NextQuery}}" hx-target="#{{.TargetID}}" hx-swap="outerHTML">Next &rarr;</button>
+        <button type="button" class="secondary outline button-with-icon" aria-label="Next page" hx-get="{{.BaseURL}}?{{.NextQuery}}" hx-target="#{{.TargetID}}" hx-swap="outerHTML">
+          <span class="pager-label">Next</span><svg class="icon" aria-hidden="true"><use href="#icon-arrow-right"></use></svg>
+        </button>
       {{else}}
-      <button class="outline" disabled>Next &rarr;</button>
+        <button type="button" class="secondary outline button-with-icon" aria-label="Next page" disabled>
+          <span class="pager-label">Next</span><svg class="icon" aria-hidden="true"><use href="#icon-arrow-right"></use></svg>
+        </button>
       {{end}}
     </li>
   </ul>

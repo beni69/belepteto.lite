@@ -1,35 +1,39 @@
 {{define "card-list"}}
-<div id="card-list">
-  {{if .Error}}<p style="color: var(--pico-del-color);">{{.Error}}</p>{{end}}
+<section id="card-list" class="panel card-list-panel">
+  <header class="panel-header">
+    <span class="panel-header-icon"><svg class="icon" aria-hidden="true"><use href="#icon-card"></use></svg></span>
+    <h2>Your cards</h2>
+  </header>
+  {{if .Error}}<p class="notice-error" role="alert">{{.Error}}</p>{{end}}
   {{if .Cards}}
-  <table>
-    <thead>
-      <tr><th>Card UID prefix</th><th>Label</th><th></th></tr>
-    </thead>
-    <tbody>
+    <ul class="card-row-list">
       {{range .Cards}}
-      <tr>
-        <td><code>{{.CardUIDPrefix}}</code></td>
-        <td>
-          <form hx-post="/htmx/cards/{{.ID}}/relabel" hx-target="#card-list" hx-swap="outerHTML">
-            <input type="text" name="label" value="{{.Label}}" placeholder="Label"
+        <li class="card-row">
+          <div class="card-identity">
+            <span class="record-icon"><svg class="icon" aria-hidden="true"><use href="#icon-card"></use></svg></span>
+            <div class="card-identity-copy">
+              <span class="record-eyebrow">Card UID prefix</span>
+              <code>{{.CardUIDPrefix}}</code>
+            </div>
+          </div>
+          <form class="card-label-form" hx-post="/htmx/cards/{{.ID}}/relabel" hx-target="#card-list" hx-swap="outerHTML">
+            <label class="visually-hidden" for="card-label-{{.ID}}">Label for card {{.CardUIDPrefix}}</label>
+            <input id="card-label-{{.ID}}" type="text" name="label" value="{{.Label}}" placeholder="Add a label"
                    aria-label="Label for card {{.CardUIDPrefix}}"
                    hx-trigger="change">
           </form>
-        </td>
-        <td>
-          <button class="secondary outline"
+          <button type="button" class="secondary outline button-danger button-with-icon button-compact"
                   hx-delete="/htmx/cards/{{.ID}}"
                   hx-target="#card-list"
                   hx-swap="outerHTML"
-                  hx-confirm="Remove this card?">Remove</button>
-        </td>
-      </tr>
+                  hx-confirm="Remove this card?">
+            <svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg><span>Remove</span>
+          </button>
+        </li>
       {{end}}
-    </tbody>
-  </table>
+    </ul>
   {{else}}
-  <p>No cards yet. Add one above.</p>
+    <p class="empty-state"><svg class="icon" aria-hidden="true"><use href="#icon-card"></use></svg>No cards yet. Add one above.</p>
   {{end}}
-</div>
+</section>
 {{end}}

@@ -1,32 +1,32 @@
 {{define "admin-pair-status"}}
 {{if eq .State "waiting"}}
-  <div hx-get="/htmx/admin/users/{{.UserID}}/pair/status" hx-target="#admin-pair-{{.UserID}}" hx-swap="innerHTML"
-       hx-trigger="every 1s">
-    <p aria-busy="true">{{.Message}}</p>
+  <div class="pair-wait" hx-get="/htmx/admin/users/{{.UserID}}/pair/status" hx-target="#admin-pair-{{.UserID}}" hx-swap="innerHTML"
+       hx-trigger="every 1s" aria-live="polite">
+    <p class="loading-state" aria-busy="true"><svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg>{{.Message}}</p>
   </div>
 {{else if eq .State "paired"}}
-  <p style="color: var(--pico-ins-color);">{{.Message}}</p>
-  <button class="secondary outline"
+  <p class="status-message status-success" role="status"><svg class="icon" aria-hidden="true"><use href="#icon-check-circle"></use></svg>{{.Message}}</p>
+  <button type="button" class="secondary outline button-with-icon button-compact"
           hx-post="/htmx/admin/users/{{.UserID}}/pair"
           hx-target="#admin-pair-{{.UserID}}"
-          hx-swap="innerHTML">Pair another card</button>
+          hx-swap="innerHTML"><svg class="icon" aria-hidden="true"><use href="#icon-card-plus"></use></svg><span>Pair another card</span></button>
 {{else if eq .State "busy"}}
-  <p style="color: var(--pico-del-color);">{{.Message}}</p>
-  <button class="secondary outline"
+  <p class="status-message status-error" role="alert"><svg class="icon" aria-hidden="true"><use href="#icon-x-circle"></use></svg>{{.Message}}</p>
+  <button type="button" class="secondary outline button-with-icon button-compact"
           hx-post="/htmx/admin/users/{{.UserID}}/pair"
           hx-target="#admin-pair-{{.UserID}}"
-          hx-swap="innerHTML">Try again</button>
+          hx-swap="innerHTML"><svg class="icon" aria-hidden="true"><use href="#icon-card-plus"></use></svg><span>Try again</span></button>
 {{else if eq .State "idle"}}
-  <button class="secondary outline"
+  <button type="button" class="secondary outline button-with-icon button-compact"
           hx-post="/htmx/admin/users/{{.UserID}}/pair"
           hx-target="#admin-pair-{{.UserID}}"
-          hx-swap="innerHTML">Pair card</button>
+          hx-swap="innerHTML"><svg class="icon" aria-hidden="true"><use href="#icon-card-plus"></use></svg><span>Pair card</span></button>
 {{else}}
   {{/* timeout, duplicate, error */}}
-  <p style="color: var(--pico-del-color);">{{.Message}}</p>
-  <button class="secondary outline"
+  <p class="status-message status-error" role="alert"><svg class="icon" aria-hidden="true"><use href="#icon-x-circle"></use></svg>{{.Message}}</p>
+  <button type="button" class="secondary outline button-with-icon button-compact"
           hx-post="/htmx/admin/users/{{.UserID}}/pair"
           hx-target="#admin-pair-{{.UserID}}"
-          hx-swap="innerHTML">Try again</button>
+          hx-swap="innerHTML"><svg class="icon" aria-hidden="true"><use href="#icon-card-plus"></use></svg><span>Try again</span></button>
 {{end}}
 {{end}}
