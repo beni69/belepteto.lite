@@ -56,7 +56,8 @@ func TestCreateAndReadUserWithCard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CardsByUser: %v", err)
 	}
-	if len(cards) != 1 || cards[0].CardUID != "DE:AD:BE:EF" {
+	wantHash := hashCardUID("DE:AD:BE:EF")
+	if len(cards) != 1 || cards[0].CardUID != wantHash || cards[0].CardUIDPrefix != "DE" {
 		t.Fatalf("unexpected cards: %+v", cards)
 	}
 }

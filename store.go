@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -25,7 +27,18 @@ type Store struct {
 	db *gorm.DB
 }
 
-const legacyCardUIDCanonicalColumn = "card_uid_canonical"
+const (
+	legacyCardUIDCanonicalColumn = "card_uid_canonical"
+	cardUIDHashMigrationName     = "card_uid_sha256"
+	cardUIDHashMigrationVersion  = 1
+)
+
+type schemaMigration struct {
+	Name    string `gorm:"primaryKey"`
+	Version int    `gorm:"not null"`
+}
+
+func (schemaMigration) TableName() string { return "schema_migrations" }
 
 func OpenStore(dsn string) (*Store, error) {
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
@@ -36,36 +49,127 @@ func OpenStore(dsn string) (*Store, error) {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
-	if err := migrateCardUID(db); err != nil {
-		return nil, fmt.Errorf("migrate card UID schema: %w", err)
-	}
-	if err := db.AutoMigrate(&User{}, &Session{}, &Card{}, &AccessGrant{}, &AccessGrantSync{}, &CardRead{}, &Entry{}); err != nil {
+	if err := db.AutoMigrate(&User{}, &Session{}, &Card{}, &AccessGrant{}, &AccessGrantSync{}, &CardRead{}, &Entry{}, &schemaMigration{}); err != nil {
 		return nil, fmt.Errorf("migrate schema: %w", err)
+	}
+	if err := migrateCardUID(db); err != nil {
+		return nil, fmt.Errorf("migrate card UID data: %w", err)
 	}
 
 	return &Store{db: db}, nil
 }
 
-// migrateCardUID removes the old derived UID column from databases created by
-// earlier versions. The old CardUID value is retained and upper-cased only;
-// separators and whitespace are intentionally left unchanged.
+// migrateCardUID hashes existing plaintext UIDs and records the migration so
+// the operation is not repeated on later startups. The migration includes
+// card reads and entries because all persisted UID-bearing values must use the
+// same representation as cards.
 func migrateCardUID(db *gorm.DB) error {
-	migrator := db.Migrator()
-	if !migrator.HasTable(&Card{}) || !migrator.HasColumn(&Card{}, legacyCardUIDCanonicalColumn) {
+	var migration schemaMigration
+	err := db.Where("name = ?", cardUIDHashMigrationName).First(&migration).Error
+	if err == nil && migration.Version >= cardUIDHashMigrationVersion {
 		return nil
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
 	}
 
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&Card{}).
-			Where("card_uid IS NOT NULL").
-			UpdateColumn("card_uid", gorm.Expr("UPPER(card_uid)")).Error; err != nil {
-			return fmt.Errorf("uppercase existing card UIDs: %w", err)
+		for _, table := range []string{"cards", "card_reads", "entries"} {
+			if err := migrateUIDTable(tx, table); err != nil {
+				return fmt.Errorf("hash UIDs in %s: %w", table, err)
+			}
 		}
-		if err := tx.Migrator().DropColumn(&Card{}, legacyCardUIDCanonicalColumn); err != nil {
-			return fmt.Errorf("drop %s: %w", legacyCardUIDCanonicalColumn, err)
+
+		if tx.Migrator().HasTable(&Card{}) && tx.Migrator().HasColumn(&Card{}, legacyCardUIDCanonicalColumn) {
+			if err := dropLegacyCardUIDColumn(tx); err != nil {
+				return fmt.Errorf("drop %s: %w", legacyCardUIDCanonicalColumn, err)
+			}
+		}
+
+		if err := tx.Where("name = ?", cardUIDHashMigrationName).Delete(&schemaMigration{}).Error; err != nil {
+			return fmt.Errorf("replace card UID migration marker: %w", err)
+		}
+		if err := tx.Create(&schemaMigration{
+			Name:    cardUIDHashMigrationName,
+			Version: cardUIDHashMigrationVersion,
+		}).Error; err != nil {
+			return fmt.Errorf("write card UID migration marker: %w", err)
 		}
 		return nil
 	})
+}
+
+// migrateUIDTable hashes every non-null card_uid and derives its safe display
+// prefix. The prefix is deliberately kept in a separate column because it is
+// impossible to recover it from a one-way hash.
+func migrateUIDTable(tx *gorm.DB, table string) error {
+	var rows []struct {
+		ID      uint    `gorm:"column:id"`
+		CardUID *string `gorm:"column:card_uid"`
+	}
+	if err := tx.Table(table).Select("id, card_uid").Find(&rows).Error; err != nil {
+		return err
+	}
+
+	for _, row := range rows {
+		if row.CardUID == nil {
+			continue
+		}
+		hash, prefix := cardUIDHashAndPrefix(*row.CardUID)
+		if err := tx.Table(table).Where("id = ?", row.ID).Updates(map[string]any{
+			"card_uid":        hash,
+			"card_uid_prefix": prefix,
+		}).Error; err != nil {
+			return fmt.Errorf("update row %d: %w", row.ID, err)
+		}
+	}
+	return nil
+}
+
+func dropLegacyCardUIDColumn(tx *gorm.DB) error {
+	// The old column had a unique index in some database versions. SQLite
+	// refuses to drop an indexed column, so remove any legacy index that refers
+	// to it before dropping the column itself.
+	var indexes []struct {
+		Name string
+	}
+	if err := tx.Raw(
+		"SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND sql LIKE ?",
+		"cards", "%card_uid_canonical%",
+	).Scan(&indexes).Error; err != nil {
+		return err
+	}
+	for _, index := range indexes {
+		quotedName := `"` + strings.ReplaceAll(index.Name, `"`, `""`) + `"`
+		if err := tx.Exec("DROP INDEX " + quotedName).Error; err != nil {
+			return err
+		}
+	}
+	return tx.Exec("ALTER TABLE cards DROP COLUMN card_uid_canonical").Error
+}
+
+func normalizeCardUID(uid string) string {
+	return strings.ToUpper(uid)
+}
+
+func cardUIDHashAndPrefix(uid string) (string, string) {
+	normalized := normalizeCardUID(uid)
+	digest := sha256.Sum256([]byte(normalized))
+	prefix := normalized
+	if len(prefix) > 2 {
+		prefix = prefix[:2]
+	}
+	return hex.EncodeToString(digest[:]), prefix
+}
+
+func hashCardUID(uid string) string {
+	hash, _ := cardUIDHashAndPrefix(uid)
+	return hash
+}
+
+func cardUIDPrefix(uid string) string {
+	_, prefix := cardUIDHashAndPrefix(uid)
+	return prefix
 }
 
 func (s *Store) CreateUser(u *User) error {
@@ -84,6 +188,9 @@ func (s *Store) CreateUser(u *User) error {
 		// GORM applies a bool default on zero values; create new users with the
 		// legacy always-allowed behavior, then change it explicitly if needed.
 		u.PermanentAccess = true
+	}
+	for i := range u.Cards {
+		prepareCardUID(&u.Cards[i])
 	}
 	err := s.db.Create(u).Error
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
@@ -243,10 +350,10 @@ func (s *Store) CardsByUser(userID uint) ([]Card, error) {
 	return cards, err
 }
 
-// CreateCard inserts a card. Card UIDs are stored in uppercase while retaining
-// the reader-provided separators and formatting.
+// CreateCard inserts a card. The raw UID is normalized, hashed, and replaced
+// with its safe display prefix before it reaches the database.
 func (s *Store) CreateCard(c *Card) error {
-	c.CardUID = strings.ToUpper(c.CardUID)
+	prepareCardUID(c)
 	err := s.db.Create(c).Error
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return ErrDuplicate
@@ -254,22 +361,28 @@ func (s *Store) CreateCard(c *Card) error {
 	return err
 }
 
-// CardExistsByUID reports whether any card has the given UID after uppercasing.
-// No separators or other formatting are removed.
+func prepareCardUID(c *Card) {
+	hash, prefix := cardUIDHashAndPrefix(c.CardUID)
+	c.CardUID = hash
+	c.CardUIDPrefix = prefix
+}
+
+// CardExistsByUID reports whether any card has the given UID after
+// normalization. No separators or other formatting are removed.
 func (s *Store) CardExistsByUID(uid string) (bool, error) {
 	var n int64
 	err := s.db.Model(&Card{}).
-		Where("card_uid = ?", strings.ToUpper(uid)).
+		Where("card_uid = ?", hashCardUID(uid)).
 		Count(&n).Error
 	return n > 0, err
 }
 
 // ActiveCardOwner returns the active user who owns an active card matching the
-// given UID after uppercasing. Returns ErrNotFound if there is no match, the
+// given UID after normalization. Returns ErrNotFound if there is no match, the
 // card is inactive, or the owner is inactive.
 func (s *Store) ActiveCardOwner(uid string) (*Card, *User, error) {
 	var c Card
-	err := s.db.Where("card_uid = ? AND active = ?", strings.ToUpper(uid), true).
+	err := s.db.Where("card_uid = ? AND active = ?", hashCardUID(uid), true).
 		First(&c).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil, ErrNotFound
@@ -321,18 +434,20 @@ func (s *Store) CountUsers() (int64, error) {
 }
 
 // CardReadView is a cardRead log row joined with the resolved user's email.
+// It intentionally contains only the safe UID prefix, never the stored hash.
 type CardReadView struct {
-	CardUID   string
-	Email     string // empty if the card was unknown
-	Accepted  bool
-	CreatedAt time.Time
+	CardUIDPrefix string
+	Email         string // empty if the card was unknown
+	Accepted      bool
+	CreatedAt     time.Time
 }
 
 // EntryView is an entry log row joined with the opener's email.
+// CardUIDPrefix is nil for remote opens.
 type EntryView struct {
-	Email     string
-	CardUID   *string // null => remote open (future)
-	CreatedAt time.Time
+	Email         string
+	CardUIDPrefix *string
+	CreatedAt     time.Time
 }
 
 // ListCardReads returns cardRead log rows newest-first, paginated. When
@@ -351,7 +466,7 @@ func (s *Store) ListCardReads(acceptedOnly bool, limit, offset int) ([]CardReadV
 
 	var views []CardReadView
 	err := q.
-		Select("card_reads.card_uid AS card_uid, card_reads.accepted AS accepted, card_reads.created_at AS created_at, users.email AS email").
+		Select("card_reads.card_uid_prefix AS card_uid_prefix, card_reads.accepted AS accepted, card_reads.created_at AS created_at, users.email AS email").
 		Joins("LEFT JOIN users ON users.id = card_reads.user_id").
 		Order("card_reads.created_at DESC").
 		Limit(limit).Offset(offset).
@@ -370,7 +485,7 @@ func (s *Store) ListEntries(limit, offset int) ([]EntryView, int64, error) {
 
 	var views []EntryView
 	err := q.
-		Select("entries.card_uid AS card_uid, entries.created_at AS created_at, users.email AS email").
+		Select("entries.card_uid_prefix AS card_uid_prefix, entries.created_at AS created_at, users.email AS email").
 		Joins("LEFT JOIN users ON users.id = entries.user_id").
 		Order("entries.created_at DESC").
 		Limit(limit).Offset(offset).
@@ -437,9 +552,20 @@ func (s *Store) DeleteUserSessions(userID uint) error {
 }
 
 func (s *Store) CreateCardRead(r *CardRead) error {
+	hash, prefix := cardUIDHashAndPrefix(r.CardUID)
+	r.CardUID = hash
+	r.CardUIDPrefix = prefix
 	return s.db.Create(r).Error
 }
 
 func (s *Store) CreateEntry(e *Entry) error {
+	if e.CardUID == nil {
+		e.CardUIDPrefix = nil
+		return s.db.Create(e).Error
+	}
+
+	hash, prefix := cardUIDHashAndPrefix(*e.CardUID)
+	e.CardUID = &hash
+	e.CardUIDPrefix = &prefix
 	return s.db.Create(e).Error
 }

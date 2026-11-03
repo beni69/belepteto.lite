@@ -32,7 +32,7 @@ func TestListCardReadsFilterAndJoin(t *testing.T) {
 		t.Fatalf("all: total=%d rows=%d, want 2/2", total, len(rows))
 	}
 	// Newest first: the denied read is newer.
-	if rows[0].CardUID != "ff:ff" || rows[0].Accepted {
+	if rows[0].CardUIDPrefix != "FF" || rows[0].Accepted {
 		t.Errorf("expected newest (denied) first, got %+v", rows[0])
 	}
 	if rows[0].Email != "" {
@@ -100,8 +100,8 @@ func TestListEntriesJoin(t *testing.T) {
 	if rows[0].Email != "opener@example.com" {
 		t.Errorf("email = %q", rows[0].Email)
 	}
-	if rows[0].CardUID == nil || *rows[0].CardUID != uid {
-		t.Errorf("card uid = %v", rows[0].CardUID)
+	if rows[0].CardUIDPrefix == nil || *rows[0].CardUIDPrefix != cardUIDPrefix(uid) {
+		t.Errorf("card uid prefix = %v", rows[0].CardUIDPrefix)
 	}
 }
 

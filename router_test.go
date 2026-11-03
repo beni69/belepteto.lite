@@ -110,11 +110,11 @@ func TestFragmentRenders(t *testing.T) {
 		t.Fatalf("LoadTemplates: %v", err)
 	}
 	rec := httptest.NewRecorder()
-	data := map[string]any{"Cards": []Card{{ID: 1, CardUID: "ABC123", Label: "keys"}}}
+	data := map[string]any{"Cards": []cardListView{{ID: 1, CardUIDPrefix: "AB", Label: "keys"}}}
 	if err := tmpl.Fragment(rec, "card-list", data); err != nil {
 		t.Fatalf("Fragment: %v", err)
 	}
-	if !strings.Contains(rec.Body.String(), "ABC123") {
-		t.Fatalf("fragment missing card UID, got: %s", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), "AB") {
+		t.Fatalf("fragment missing card UID prefix, got: %s", rec.Body.String())
 	}
 }
