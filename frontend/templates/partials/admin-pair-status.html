@@ -1,0 +1,32 @@
+{{define "admin-pair-status"}}
+{{if eq .State "waiting"}}
+  <div hx-get="/htmx/admin/users/{{.UserID}}/pair/status" hx-target="#admin-pair-{{.UserID}}" hx-swap="innerHTML"
+       hx-trigger="every 1s">
+    <p aria-busy="true">{{.Message}}</p>
+  </div>
+{{else if eq .State "paired"}}
+  <p style="color: var(--pico-ins-color);">{{.Message}}</p>
+  <button class="secondary outline"
+          hx-post="/htmx/admin/users/{{.UserID}}/pair"
+          hx-target="#admin-pair-{{.UserID}}"
+          hx-swap="innerHTML">Pair another card</button>
+{{else if eq .State "busy"}}
+  <p style="color: var(--pico-del-color);">{{.Message}}</p>
+  <button class="secondary outline"
+          hx-post="/htmx/admin/users/{{.UserID}}/pair"
+          hx-target="#admin-pair-{{.UserID}}"
+          hx-swap="innerHTML">Try again</button>
+{{else if eq .State "idle"}}
+  <button class="secondary outline"
+          hx-post="/htmx/admin/users/{{.UserID}}/pair"
+          hx-target="#admin-pair-{{.UserID}}"
+          hx-swap="innerHTML">Pair card</button>
+{{else}}
+  {{/* timeout, duplicate, error */}}
+  <p style="color: var(--pico-del-color);">{{.Message}}</p>
+  <button class="secondary outline"
+          hx-post="/htmx/admin/users/{{.UserID}}/pair"
+          hx-target="#admin-pair-{{.UserID}}"
+          hx-swap="innerHTML">Try again</button>
+{{end}}
+{{end}}

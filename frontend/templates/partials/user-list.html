@@ -31,6 +31,12 @@
     {{end}}
   </td>
   <td>
+    <div id="admin-pair-{{.ID}}">
+      <button class="secondary outline"
+              hx-post="/htmx/admin/users/{{.ID}}/pair"
+              hx-target="#admin-pair-{{.ID}}"
+              hx-swap="innerHTML">Pair card</button>
+    </div>
     {{if .PermanentAccess}}
       <button class="secondary outline"
               hx-post="/htmx/admin/users/{{.ID}}/scheduled-access"
