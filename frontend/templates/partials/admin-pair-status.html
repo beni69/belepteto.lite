@@ -10,6 +10,8 @@
           hx-post="/htmx/admin/users/{{.UserID}}/pair"
           hx-target="#admin-pair-{{.UserID}}"
           hx-swap="innerHTML"><svg class="icon" aria-hidden="true"><use href="#icon-card-plus"></use></svg><span>Pair another card</span></button>
+  <div hx-get="/htmx/admin/users/{{.UserID}}/cards" hx-target="#admin-user-cards-{{.UserID}}"
+       hx-swap="outerHTML" hx-trigger="load"></div>
 {{else if eq .State "busy"}}
   <p class="status-message status-error" role="alert"><svg class="icon" aria-hidden="true"><use href="#icon-x-circle"></use></svg>{{.Message}}</p>
   <button type="button" class="secondary outline button-with-icon button-compact"

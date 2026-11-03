@@ -1,5 +1,6 @@
 {{define "user-list"}}
-<section id="user-list" class="panel list-panel user-list-panel">
+<section id="user-list" class="panel list-panel user-list-panel"
+         hx-get="/htmx/admin/users" hx-trigger="user-created from:body" hx-swap="outerHTML" hx-sync="this:replace">
   <header class="panel-header">
     <span class="panel-header-icon"><svg class="icon" aria-hidden="true"><use href="#icon-users"></use></svg></span>
     <h2>People</h2>
@@ -88,6 +89,43 @@
         </button>
       {{end}}
     </div>
+
+    {{template "admin-user-cards" .}}
   </article>
 </li>
+{{end}}
+
+{{define "admin-user-cards"}}
+<details id="admin-user-cards-{{.ID}}" class="admin-card-manager" {{if .CardsExpanded}}open{{end}}>
+  <summary><svg class="icon" aria-hidden="true"><use href="#icon-card"></use></svg>Cards ({{len .Cards}})</summary>
+  {{if .Cards}}
+    <ul class="admin-card-list">
+      {{range .Cards}}
+        <li class="admin-card-row">
+          <div class="card-identity">
+            <span class="record-icon"><svg class="icon" aria-hidden="true"><use href="#icon-card"></use></svg></span>
+            <div class="card-identity-copy">
+              <span class="record-eyebrow">Card UID prefix</span>
+              <code>{{.CardUIDPrefix}}</code>
+            </div>
+          </div>
+          <form class="card-label-form" hx-post="/htmx/admin/users/{{$.ID}}/cards/{{.ID}}/relabel"
+                hx-target="#admin-user-cards-{{$.ID}}" hx-swap="outerHTML">
+            <label class="visually-hidden" for="admin-card-label-{{$.ID}}-{{.ID}}">Label for card {{.CardUIDPrefix}}</label>
+            <input id="admin-card-label-{{$.ID}}-{{.ID}}" type="text" name="label" value="{{.Label}}" placeholder="Add a label"
+                   aria-label="Label for card {{.CardUIDPrefix}}" hx-trigger="change">
+          </form>
+          <button type="button" class="secondary outline button-danger button-with-icon button-compact"
+                  hx-delete="/htmx/admin/users/{{$.ID}}/cards/{{.ID}}"
+                  hx-target="#admin-user-cards-{{$.ID}}" hx-swap="outerHTML"
+                  hx-confirm="Unpair card {{.CardUIDPrefix}} from {{$.Email}}? It can be paired again afterwards.">
+            <svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg><span>Unpair</span>
+          </button>
+        </li>
+      {{end}}
+    </ul>
+  {{else}}
+    <p class="empty-state"><svg class="icon" aria-hidden="true"><use href="#icon-card"></use></svg>No cards paired yet.</p>
+  {{end}}
+</details>
 {{end}}

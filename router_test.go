@@ -44,7 +44,7 @@ func TestHealthz(t *testing.T) {
 func TestStaticAssets(t *testing.T) {
 	srv := newTestServer(t)
 
-	for _, path := range []string{"/static/pico.min.css", "/static/htmx.min.js"} {
+	for _, path := range []string{"/static/pico.min.css", "/static/htmx.min.js", "/static/app.css", "/static/door-open.js"} {
 		resp, err := http.Get(srv.URL + path)
 		if err != nil {
 			t.Fatalf("GET %s: %v", path, err)

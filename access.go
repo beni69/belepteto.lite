@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+var ErrDoorAccessDenied = errors.New("door access denied")
+
 // PairingState is the lifecycle of the single global pairing session.
 type PairingState string
 
@@ -28,9 +30,9 @@ type PairingStatus struct {
 	Message string
 }
 
-// AccessService is the stateless decision core for card reads plus the single
-// global card-pairing session. It subscribes to the controller's cardRead topic
-// and publishes doorControl / command responses.
+// AccessService handles card-read decisions, remote door opens, and the single
+// global card-pairing session. It subscribes to cardRead and publishes
+// doorControl / command responses.
 type AccessService struct {
 	store   *Store
 	broker  *Broker
@@ -60,6 +62,56 @@ func NewAccessService(store *Store, broker *Broker, topics ControllerTopics, log
 		timeout:    10 * time.Second,
 		lastResult: make(map[uint]PairingStatus),
 	}
+}
+
+// CanOpenDoorAt checks the current account and access window for a user. It is
+// used both to decide whether the UI should show remote open and to enforce the
+// policy again when a user submits an open request.
+func (a *AccessService) CanOpenDoorAt(userID uint, at time.Time) (bool, error) {
+	user, err := a.store.UserByID(userID)
+	if errors.Is(err, ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return a.userHasDoorAccess(user, at)
+}
+
+func (a *AccessService) CanOpenDoor(userID uint) (bool, error) {
+	return a.CanOpenDoorAt(userID, time.Now().UTC())
+}
+
+func (a *AccessService) userHasDoorAccess(user *User, at time.Time) (bool, error) {
+	if !user.Active {
+		return false, nil
+	}
+	if user.PermanentAccess {
+		return true, nil
+	}
+	return a.store.HasActiveAccessGrant(user.ID, at.UTC())
+}
+
+// OpenDoorForUser rechecks authorization immediately before publishing the
+// controller's remote-open command. Unlike card-read replies, remote opens have
+// no card-read correlation ID, so the protocol command is plain "open".
+func (a *AccessService) OpenDoorForUser(userID uint) error {
+	now := time.Now().UTC()
+	allowed, err := a.CanOpenDoorAt(userID, now)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return ErrDoorAccessDenied
+	}
+	if err := a.broker.PublishString(a.topics.DoorControl(), DoorOpen, QoSExactlyOnce); err != nil {
+		return err
+	}
+	if err := a.store.CreateEntry(&Entry{UserID: userID, CreatedAt: now}); err != nil {
+		a.logger.Error("log remote door open", "user", userID, "err", err)
+	}
+	a.logger.Info("remote door open requested", "user", userID)
+	return nil
 }
 
 // Start subscribes to the controller's cardRead topic.
@@ -177,14 +229,10 @@ func (a *AccessService) handleAccessRead(msg CardReadMsg, received time.Time) {
 		accepted := false
 		if err == nil {
 			uid = &user.ID
-			if user.PermanentAccess {
-				accepted = true
-			} else {
-				accepted, err = a.store.HasActiveAccessGrant(user.ID, received)
-				if err != nil {
-					a.logger.Error("check scheduled access", "user", user.ID, "err", err)
-					accepted = false
-				}
+			accepted, err = a.userHasDoorAccess(user, received)
+			if err != nil {
+				a.logger.Error("check scheduled access", "user", user.ID, "err", err)
+				accepted = false
 			}
 			if accepted {
 				anyMatch = true

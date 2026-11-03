@@ -63,6 +63,8 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *Acces
 	r.Group(func(r chi.Router) {
 		r.Use(s.RequireAuth)
 		r.Get("/", s.handleHome)
+		r.Get("/htmx/door-open-control", s.handleDoorOpenControl)
+		r.Post("/htmx/door/open", s.handleDoorOpen)
 
 		r.Get("/htmx/cards", s.handleCardList)
 		r.Post("/htmx/cards/pair", s.handleCardPairStart)
@@ -77,10 +79,14 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *Acces
 
 			r.Get("/htmx/admin/users", s.handleAdminUserList)
 			r.Post("/htmx/admin/users", s.handleAdminUserCreate)
+			r.Get("/htmx/admin/access-grant-users", s.handleAdminAccessGrantUsers)
 			r.Post("/htmx/admin/users/{id}/activate", s.handleAdminUserActivate)
 			r.Post("/htmx/admin/users/{id}/deactivate", s.handleAdminUserDeactivate)
 			r.Post("/htmx/admin/users/{id}/pair", s.handleAdminUserPairStart)
 			r.Get("/htmx/admin/users/{id}/pair/status", s.handleAdminUserPairStatus)
+			r.Get("/htmx/admin/users/{userID}/cards", s.handleAdminUserCards)
+			r.Post("/htmx/admin/users/{userID}/cards/{cardID}/relabel", s.handleAdminCardRelabel)
+			r.Delete("/htmx/admin/users/{userID}/cards/{cardID}", s.handleAdminCardDelete)
 			r.Post("/htmx/admin/users/{id}/scheduled-access", s.handleAdminUserScheduledAccess)
 			r.Post("/htmx/admin/users/{id}/permanent-access", s.handleAdminUserPermanentAccess)
 
@@ -98,9 +104,11 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *Acces
 
 func (s *server) handleHome(w http.ResponseWriter, r *http.Request) {
 	u := userFromContext(r.Context())
+	canOpenDoor := s.canOpenDoorForPage(u)
 	s.render(w, "home", map[string]any{
-		"IsAdmin": u.Admin,
-		"Account": accountViewForUser(u),
+		"IsAdmin":     u.Admin,
+		"Account":     accountViewForUser(u),
+		"CanOpenDoor": canOpenDoor,
 	})
 }
 
@@ -112,7 +120,20 @@ func (s *server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	s.render(w, "admin", map[string]any{"IsAdmin": u.Admin, "Users": users})
+	s.render(w, "admin", map[string]any{
+		"IsAdmin":     u.Admin,
+		"CanOpenDoor": s.canOpenDoorForPage(u),
+		"Users":       users,
+	})
+}
+
+func (s *server) canOpenDoorForPage(user *User) bool {
+	allowed, err := s.access.CanOpenDoor(user.ID)
+	if err != nil {
+		s.logger.Error("check door access for page", "user", user.ID, "err", err)
+		return false
+	}
+	return allowed
 }
 
 func (s *server) render(w http.ResponseWriter, name string, data any) {

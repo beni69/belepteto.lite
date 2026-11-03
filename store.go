@@ -173,30 +173,53 @@ func cardUIDPrefix(uid string) string {
 }
 
 func (s *Store) CreateUser(u *User) error {
+	return s.createUser(u, true)
+}
+
+// CreateUserWithAccess creates a user with an explicit door access policy.
+// CreateUser remains always-allowed by default for existing callers.
+func (s *Store) CreateUserWithAccess(u *User, permanentAccess bool) error {
+	return s.createUser(u, permanentAccess)
+}
+
+func (s *Store) createUser(u *User, permanentAccess bool) error {
 	u.Email = normalizeEmail(u.Email)
 	if u.Email == "" {
 		return errors.New("email is required")
 	}
-	var existing int64
-	if err := s.db.Model(&User{}).Where("LOWER(email) = ?", u.Email).Count(&existing).Error; err != nil {
-		return err
-	}
-	if existing > 0 {
-		return ErrDuplicate
-	}
-	if !u.PermanentAccess {
-		// GORM applies a bool default on zero values; create new users with the
-		// legacy always-allowed behavior, then change it explicitly if needed.
-		u.PermanentAccess = true
-	}
 	for i := range u.Cards {
 		prepareCardUID(&u.Cards[i])
 	}
-	err := s.db.Create(u).Error
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return ErrDuplicate
+
+	// GORM applies the bool column default to a zero value during Create. Insert
+	// with the legacy true value, then explicitly update to false in the same
+	// transaction when scheduled-only access was requested.
+	u.PermanentAccess = true
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var existing int64
+		if err := tx.Model(&User{}).Where("LOWER(email) = ?", u.Email).Count(&existing).Error; err != nil {
+			return err
+		}
+		if existing > 0 {
+			return ErrDuplicate
+		}
+
+		if err := tx.Create(u).Error; err != nil {
+			if errors.Is(err, gorm.ErrDuplicatedKey) {
+				return ErrDuplicate
+			}
+			return err
+		}
+		if !permanentAccess {
+			return tx.Model(&User{}).Where("id = ?", u.ID).UpdateColumn("permanent_access", false).Error
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
-	return err
+	u.PermanentAccess = permanentAccess
+	return nil
 }
 
 // SetUserActive toggles a user's active flag. When deactivating, the caller is
@@ -341,6 +364,12 @@ func (s *Store) UserByID(id uint) (*User, error) {
 func (s *Store) ListUsers() ([]User, error) {
 	var users []User
 	err := s.db.Order("created_at asc").Find(&users).Error
+	return users, err
+}
+
+func (s *Store) ListUsersWithCards() ([]User, error) {
+	var users []User
+	err := s.db.Preload("Cards").Order("created_at asc").Find(&users).Error
 	return users, err
 }
 

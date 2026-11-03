@@ -45,16 +45,8 @@ func (s *server) setAdminUserPermanentAccess(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	user, err := s.store.UserByID(uint(id))
-	if err != nil {
-		s.logger.Error("reload user after access setting", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	if err := s.tmpl.Fragment(w, "user-row", user); err != nil {
-		s.logger.Error("render user row after access setting", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-	}
+	w.Header().Set("HX-Trigger", "user-updated")
+	s.renderAdminUserRow(w, uint(id))
 }
 
 func (s *server) handleAdminAccessGrantList(w http.ResponseWriter, r *http.Request) {

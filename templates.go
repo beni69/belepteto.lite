@@ -27,7 +27,7 @@ func LoadTemplates() (*Templates, error) {
 	t := &Templates{pages: make(map[string]*template.Template)}
 
 	for name, file := range pages {
-		tmpl, err := template.New(name).ParseFS(frontend.FS, dir+"/base.html", file)
+		tmpl, err := template.New(name).ParseFS(frontend.FS, dir+"/base.html", dir+"/partials/door-open-control.html", file)
 		if err != nil {
 			return nil, fmt.Errorf("parse page %q: %w", name, err)
 		}
