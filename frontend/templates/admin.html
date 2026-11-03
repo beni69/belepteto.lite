@@ -1,75 +1,101 @@
 {{define "title"}}Admin{{end}}
 {{define "content"}}
-<hgroup>
-  <h1>Admin</h1>
+<hgroup class="page-heading">
+  <h1><svg class="icon heading-icon" aria-hidden="true"><use href="#icon-users"></use></svg>Admin</h1>
   <p>Manage users and review access.</p>
 </hgroup>
 
-<article>
-  <header>Register a user</header>
-  <form hx-post="/htmx/admin/users" hx-target="#user-list" hx-swap="outerHTML"
-        hx-on::after-request="if(event.detail.successful) this.reset()">
-    <div class="grid">
-      <input type="email" name="email" placeholder="Email" autocomplete="off" required>
-      <input type="password" name="password" placeholder="Initial password" autocomplete="new-password" required>
-    </div>
-    <fieldset>
-      <label>
-        <input type="checkbox" name="admin" role="switch">
-        Grant admin privileges
-      </label>
-    </fieldset>
-    <button type="submit">Register user</button>
-  </form>
-</article>
+<div class="content-stack">
+  <article class="panel register-panel">
+    <header class="panel-header">
+      <span class="panel-header-icon"><svg class="icon" aria-hidden="true"><use href="#icon-user-plus"></use></svg></span>
+      <h2>Register a user</h2>
+    </header>
+    <form class="form-stack" hx-post="/htmx/admin/users" hx-target="#user-list" hx-swap="outerHTML"
+          hx-on::after-request="if(event.detail.successful) this.reset()">
+      <div class="form-grid form-grid-two">
+        <label>
+          Email
+          <input type="email" name="email" autocomplete="off" required>
+        </label>
+        <label>
+          Initial password
+          <input type="password" name="password" autocomplete="new-password" required>
+        </label>
+      </div>
+      <fieldset class="permission-fieldset">
+        <label class="toggle-row">
+          <input type="checkbox" name="admin" role="switch">
+          Grant admin privileges
+        </label>
+      </fieldset>
+      <button type="submit" class="button-with-icon"><svg class="icon" aria-hidden="true"><use href="#icon-user-plus"></use></svg><span>Register user</span></button>
+    </form>
+  </article>
 
-<div id="user-list" hx-get="/htmx/admin/users" hx-trigger="load">
-  <p aria-busy="true">Loading users…</p>
+  <section id="user-list" class="panel list-panel user-list-panel" hx-get="/htmx/admin/users" hx-trigger="load" hx-swap="outerHTML">
+    <header class="panel-header">
+      <span class="panel-header-icon"><svg class="icon" aria-hidden="true"><use href="#icon-users"></use></svg></span>
+      <h2>People</h2>
+    </header>
+    <p class="loading-state" aria-busy="true"><svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg>Loading users…</p>
+  </section>
+
+  <article class="panel grants-panel">
+    <header class="panel-header">
+      <span class="panel-header-icon"><svg class="icon" aria-hidden="true"><use href="#icon-calendar"></use></svg></span>
+      <h2>Temporary entry times</h2>
+    </header>
+    <p class="panel-description">
+      Choose who may enter and when. A person who is allowed in at any time will
+      keep that access until you change their setting in the people list.
+    </p>
+    <div class="grant-layout">
+      <form class="form-stack grant-form" hx-post="/htmx/admin/access-grants" hx-target="#access-grant-list" hx-swap="outerHTML">
+        <label>
+          Person
+          <select name="user_id" required>
+            <option value="">Choose a person</option>
+            {{range .Users}}
+              {{if .Active}}
+                <option value="{{.ID}}">{{.Email}}{{if .PermanentAccess}} — always allowed{{else}} — scheduled times only{{end}}</option>
+              {{end}}
+            {{end}}
+          </select>
+        </label>
+        <div class="form-grid form-grid-two">
+          <label>Starts <input type="datetime-local" name="valid_from" required></label>
+          <label>Ends <input type="datetime-local" name="valid_until" required></label>
+        </div>
+        <small class="field-note">Times use this server’s local time.</small>
+        <button type="submit" class="button-with-icon"><svg class="icon" aria-hidden="true"><use href="#icon-calendar"></use></svg><span>Save entry time</span></button>
+      </form>
+      <div id="access-grant-list" class="grant-list-region" hx-get="/htmx/admin/access-grants" hx-trigger="load" hx-swap="outerHTML">
+        <p class="loading-state" aria-busy="true"><svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg>Loading entry times…</p>
+      </div>
+    </div>
+  </article>
+
+  <article class="panel log-panel">
+    <header class="panel-header">
+      <span class="panel-header-icon"><svg class="icon" aria-hidden="true"><use href="#icon-door"></use></svg></span>
+      <h2>Entry log</h2>
+    </header>
+    <p class="panel-description">Every time the door opened.</p>
+    <div id="entry-log" class="log-region" hx-get="/htmx/admin/logs/entries" hx-trigger="load" hx-swap="outerHTML">
+      <p class="loading-state" aria-busy="true"><svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg>Loading entries…</p>
+    </div>
+  </article>
+
+  <article class="panel log-panel">
+    <header class="panel-header">
+      <span class="panel-header-icon"><svg class="icon" aria-hidden="true"><use href="#icon-card"></use></svg></span>
+      <h2>Card reads</h2>
+    </header>
+    <p class="panel-description">Every card presented to the reader.</p>
+    <div id="cardread-log" class="log-region" hx-get="/htmx/admin/logs/cardreads" hx-trigger="load" hx-swap="outerHTML">
+      <p class="loading-state" aria-busy="true"><svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg>Loading card reads…</p>
+    </div>
+  </article>
 </div>
-
-<article>
-  <header>Temporary entry times</header>
-  <p>
-    Choose who may enter and when. A person who is allowed in at any time will
-    keep that access until you change their setting in the people list.
-  </p>
-  <form hx-post="/htmx/admin/access-grants" hx-target="#access-grant-list" hx-swap="outerHTML">
-    <label>
-      Person
-      <select name="user_id" required>
-        <option value="">Choose a person</option>
-        {{range .Users}}
-          {{if .Active}}
-            <option value="{{.ID}}">{{.Email}}{{if .PermanentAccess}} — always allowed{{else}} — scheduled times only{{end}}</option>
-          {{end}}
-        {{end}}
-      </select>
-    </label>
-    <div class="grid">
-      <label>Starts <input type="datetime-local" name="valid_from" required></label>
-      <label>Ends <input type="datetime-local" name="valid_until" required></label>
-    </div>
-    <small>Times use this server’s local time.</small>
-    <button type="submit">Save entry time</button>
-  </form>
-  <div id="access-grant-list" hx-get="/htmx/admin/access-grants" hx-trigger="load">
-    <p aria-busy="true">Loading entry times…</p>
-  </div>
-</article>
-
-<article>
-  <header>Entry log</header>
-  <p>Every time the door opened.</p>
-  <div id="entry-log" hx-get="/htmx/admin/logs/entries" hx-trigger="load">
-    <p aria-busy="true">Loading entries…</p>
-  </div>
-</article>
-
-<article>
-  <header>Card reads</header>
-  <p>Every card presented to the reader.</p>
-  <div id="cardread-log" hx-get="/htmx/admin/logs/cardreads" hx-trigger="load">
-    <p aria-busy="true">Loading card reads…</p>
-  </div>
-</article>
 {{end}}

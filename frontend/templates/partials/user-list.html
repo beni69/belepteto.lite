@@ -1,67 +1,93 @@
 {{define "user-list"}}
-<div id="user-list">
-  {{if .Error}}<p style="color: var(--pico-del-color);">{{.Error}}</p>{{end}}
-  <table>
-    <thead>
-      <tr><th>Email</th><th>Role</th><th>Status</th><th>Door access</th><th></th></tr>
-    </thead>
-    <tbody>
+<section id="user-list" class="panel list-panel user-list-panel">
+  <header class="panel-header">
+    <span class="panel-header-icon"><svg class="icon" aria-hidden="true"><use href="#icon-users"></use></svg></span>
+    <h2>People</h2>
+  </header>
+  {{if .Error}}<p class="notice-error" role="alert">{{.Error}}</p>{{end}}
+  {{if .Users}}
+    <ul class="user-card-list">
       {{range .Users}}{{template "user-row" .}}{{end}}
-    </tbody>
-  </table>
-</div>
+    </ul>
+  {{else if not .Error}}
+    <p class="empty-state"><svg class="icon" aria-hidden="true"><use href="#icon-users"></use></svg>No users registered yet.</p>
+  {{end}}
+</section>
 {{end}}
 
 {{define "user-row"}}
-<tr id="user-{{.ID}}">
-  <td>{{.Email}}</td>
-  <td>{{if .Admin}}Admin{{else}}User{{end}}</td>
-  <td>
-    {{if .Active}}
-      <ins>Active</ins>
-    {{else}}
-      <del>Inactive</del>
-    {{end}}
-  </td>
-  <td>
-    {{if .PermanentAccess}}
-      <ins>Always allowed</ins>
-    {{else}}
-      <mark>Only during listed times</mark>
-    {{end}}
-  </td>
-  <td>
-    <div id="admin-pair-{{.ID}}">
-      <button class="secondary outline"
-              hx-post="/htmx/admin/users/{{.ID}}/pair"
-              hx-target="#admin-pair-{{.ID}}"
-              hx-swap="innerHTML">Pair card</button>
+<li id="user-{{.ID}}" class="user-card-item">
+  <article class="user-card">
+    <div class="user-card-main">
+      <span class="user-avatar"><svg class="icon icon-large" aria-hidden="true"><use href="#icon-user"></use></svg></span>
+      <div class="user-card-identity">
+        <h3>{{.Email}}</h3>
+        <div class="user-badges">
+          <span class="status-pill status-neutral">
+            {{if .Admin}}
+              <svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg>
+            {{else}}
+              <svg class="icon" aria-hidden="true"><use href="#icon-user"></use></svg>
+            {{end}}
+            {{if .Admin}}Admin{{else}}User{{end}}
+          </span>
+          {{if .Active}}
+            <span class="status-pill status-positive"><svg class="icon" aria-hidden="true"><use href="#icon-check-circle"></use></svg>Active</span>
+          {{else}}
+            <span class="status-pill status-negative"><svg class="icon" aria-hidden="true"><use href="#icon-x-circle"></use></svg>Inactive</span>
+          {{end}}
+          {{if .PermanentAccess}}
+            <span class="status-pill status-info"><svg class="icon" aria-hidden="true"><use href="#icon-door"></use></svg>Always allowed</span>
+          {{else}}
+            <span class="status-pill status-info"><svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg>Only during listed times</span>
+          {{end}}
+        </div>
+      </div>
     </div>
-    {{if .PermanentAccess}}
-      <button class="secondary outline"
-              hx-post="/htmx/admin/users/{{.ID}}/scheduled-access"
-              hx-target="#user-{{.ID}}"
-              hx-swap="outerHTML"
-              hx-confirm="{{.Email}} will only be able to enter during saved time windows. Continue?">Use scheduled times</button>
-    {{else}}
-      <button class="secondary outline"
-              hx-post="/htmx/admin/users/{{.ID}}/permanent-access"
-              hx-target="#user-{{.ID}}"
-              hx-swap="outerHTML"
-              hx-confirm="{{.Email}} will be allowed to enter at any time. Continue?">Allow anytime</button>
-    {{end}}
-    {{if .Active}}
-      <button class="secondary outline"
-              hx-post="/htmx/admin/users/{{.ID}}/deactivate"
-              hx-target="#user-{{.ID}}"
-              hx-swap="outerHTML"
-              hx-confirm="Deactivate {{.Email}}? This logs them out immediately.">Deactivate</button>
-    {{else}}
-      <button class="outline"
-              hx-post="/htmx/admin/users/{{.ID}}/activate"
-              hx-target="#user-{{.ID}}"
-              hx-swap="outerHTML">Activate</button>
-    {{end}}
-  </td>
-</tr>
+
+    <div class="user-actions" role="group" aria-label="Actions for {{.Email}}">
+      <div id="admin-pair-{{.ID}}" class="user-pair-area">
+        <button type="button" class="secondary outline button-with-icon button-compact"
+                hx-post="/htmx/admin/users/{{.ID}}/pair"
+                hx-target="#admin-pair-{{.ID}}"
+                hx-swap="innerHTML">
+          <svg class="icon" aria-hidden="true"><use href="#icon-card-plus"></use></svg><span>Pair card</span>
+        </button>
+      </div>
+      {{if .PermanentAccess}}
+        <button type="button" class="secondary outline button-with-icon button-compact"
+                hx-post="/htmx/admin/users/{{.ID}}/scheduled-access"
+                hx-target="#user-{{.ID}}"
+                hx-swap="outerHTML"
+                hx-confirm="{{.Email}} will only be able to enter during saved time windows. Continue?">
+          <svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg><span>Use scheduled times</span>
+        </button>
+      {{else}}
+        <button type="button" class="secondary outline button-with-icon button-compact"
+                hx-post="/htmx/admin/users/{{.ID}}/permanent-access"
+                hx-target="#user-{{.ID}}"
+                hx-swap="outerHTML"
+                hx-confirm="{{.Email}} will be allowed to enter at any time. Continue?">
+          <svg class="icon" aria-hidden="true"><use href="#icon-door"></use></svg><span>Allow anytime</span>
+        </button>
+      {{end}}
+      {{if .Active}}
+        <button type="button" class="secondary outline button-danger button-with-icon button-compact"
+                hx-post="/htmx/admin/users/{{.ID}}/deactivate"
+                hx-target="#user-{{.ID}}"
+                hx-swap="outerHTML"
+                hx-confirm="Deactivate {{.Email}}? This logs them out immediately.">
+          <svg class="icon" aria-hidden="true"><use href="#icon-user-minus"></use></svg><span>Deactivate</span>
+        </button>
+      {{else}}
+        <button type="button" class="outline button-with-icon button-compact"
+                hx-post="/htmx/admin/users/{{.ID}}/activate"
+                hx-target="#user-{{.ID}}"
+                hx-swap="outerHTML">
+          <svg class="icon" aria-hidden="true"><use href="#icon-user-plus"></use></svg><span>Activate</span>
+        </button>
+      {{end}}
+    </div>
+  </article>
+</li>
 {{end}}
