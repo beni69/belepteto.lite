@@ -28,6 +28,36 @@
 </div>
 
 <article>
+  <header>Temporary entry times</header>
+  <p>
+    Choose who may enter and when. A person who is allowed in at any time will
+    keep that access until you change their setting in the people list.
+  </p>
+  <form hx-post="/htmx/admin/access-grants" hx-target="#access-grant-list" hx-swap="outerHTML">
+    <label>
+      Person
+      <select name="user_id" required>
+        <option value="">Choose a person</option>
+        {{range .Users}}
+          {{if .Active}}
+            <option value="{{.ID}}">{{.Email}}{{if .PermanentAccess}} — always allowed{{else}} — scheduled times only{{end}}</option>
+          {{end}}
+        {{end}}
+      </select>
+    </label>
+    <div class="grid">
+      <label>Starts <input type="datetime-local" name="valid_from" required></label>
+      <label>Ends <input type="datetime-local" name="valid_until" required></label>
+    </div>
+    <small>Times use this server’s local time.</small>
+    <button type="submit">Save entry time</button>
+  </form>
+  <div id="access-grant-list" hx-get="/htmx/admin/access-grants" hx-trigger="load">
+    <p aria-busy="true">Loading entry times…</p>
+  </div>
+</article>
+
+<article>
   <header>Entry log</header>
   <p>Every time the door opened.</p>
   <div id="entry-log" hx-get="/htmx/admin/logs/entries" hx-trigger="load">

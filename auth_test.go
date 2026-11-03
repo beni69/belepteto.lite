@@ -21,7 +21,7 @@ func authTestServer(t *testing.T) (*httptest.Server, *Store) {
 	}
 	store := newTestStore(t)
 	access := newTestAccess(t, store)
-	srv := httptest.NewServer(newRouter(logger, tmpl, store, access))
+	srv := httptest.NewServer(newRouter(logger, tmpl, store, access, "", nil))
 	t.Cleanup(srv.Close)
 	return srv, store
 }

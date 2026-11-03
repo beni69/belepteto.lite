@@ -18,7 +18,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	}
 	store := newTestStore(t)
 	access := newTestAccess(t, store)
-	srv := httptest.NewServer(newRouter(logger, tmpl, store, access))
+	srv := httptest.NewServer(newRouter(logger, tmpl, store, access, "", nil))
 	t.Cleanup(srv.Close)
 	return srv
 }

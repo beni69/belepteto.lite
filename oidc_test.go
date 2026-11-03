@@ -379,7 +379,7 @@ func (p *fakeOIDCProvider) setIdentity(identity fakeOIDCIdentity) {
 func (p *fakeOIDCProvider) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/.well-known/openid-configuration":
-		writeJSON(w, map[string]any{
+		writeOIDCJSON(w, map[string]any{
 			"issuer":                                p.server.URL,
 			"authorization_endpoint":                p.server.URL + "/authorize",
 			"token_endpoint":                        p.server.URL + "/token",
@@ -392,7 +392,7 @@ func (p *fakeOIDCProvider) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/token":
 		p.token(w, r)
 	case "/jwks":
-		writeJSON(w, map[string]any{"keys": []any{map[string]any{
+		writeOIDCJSON(w, map[string]any{"keys": []any{map[string]any{
 			"kty": "RSA",
 			"kid": "test-key",
 			"use": "sig",
@@ -459,7 +459,7 @@ func (p *fakeOIDCProvider) token(w http.ResponseWriter, r *http.Request) {
 	p.tokens[accessToken] = login.identity
 	p.mu.Unlock()
 	idToken := p.signIDToken(login.nonce, login.identity)
-	writeJSON(w, map[string]any{
+	writeOIDCJSON(w, map[string]any{
 		"access_token": accessToken,
 		"token_type":   "Bearer",
 		"expires_in":   3600,
@@ -476,7 +476,7 @@ func (p *fakeOIDCProvider) userinfo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid access token", http.StatusUnauthorized)
 		return
 	}
-	writeJSON(w, map[string]any{
+	writeOIDCJSON(w, map[string]any{
 		"sub":            identity.subject,
 		"email":          identity.email,
 		"email_verified": identity.verified,
@@ -522,7 +522,7 @@ func (p *fakeOIDCProvider) signIDToken(nonce string, identity fakeOIDCIdentity) 
 	return unsigned + "." + base64.RawURLEncoding.EncodeToString(signature)
 }
 
-func writeJSON(w http.ResponseWriter, value any) {
+func writeOIDCJSON(w http.ResponseWriter, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(value); err != nil {
 		http.Error(w, "encode response", http.StatusInternalServerError)
@@ -556,7 +556,7 @@ func newOIDCTestServer(t *testing.T, provider *fakeOIDCProvider, buttonText stri
 		listener.Close()
 		t.Fatalf("configure test OIDC: %v", err)
 	}
-	srv := httptest.NewUnstartedServer(newRouter(logger, tmpl, store, access, sso))
+	srv := httptest.NewUnstartedServer(newRouter(logger, tmpl, store, access, "", sso))
 	srv.Listener = listener
 	srv.Start()
 	t.Cleanup(srv.Close)

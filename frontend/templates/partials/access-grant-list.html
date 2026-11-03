@@ -1,0 +1,32 @@
+{{define "access-grant-list"}}
+<div id="access-grant-list">
+  {{if .Error}}<p style="color: var(--pico-del-color);">{{.Error}}</p>{{end}}
+  {{if .Grants}}
+    <table>
+      <thead>
+        <tr><th>Person</th><th>Starts</th><th>Ends</th><th>Status</th><th>Added by</th><th></th></tr>
+      </thead>
+      <tbody>
+        {{range .Grants}}
+          <tr>
+            <td>{{.Email}}</td>
+            <td>{{.FromDisplay}}</td>
+            <td>{{.UntilDisplay}}</td>
+            <td>{{.Status}}</td>
+            <td>{{.SourceLabel}}</td>
+            <td>
+              <button class="secondary outline"
+                      hx-post="/htmx/admin/access-grants/{{.ID}}/revoke"
+                      hx-target="#access-grant-list"
+                      hx-swap="outerHTML"
+                      hx-confirm="Remove this entry time?{{if .External}} A future update from the connected system may add it again.{{end}}">Remove</button>
+            </td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  {{else}}
+    <p>No current or upcoming entry times.</p>
+  {{end}}
+</div>
+{{end}}

@@ -3,7 +3,7 @@
   {{if .Error}}<p style="color: var(--pico-del-color);">{{.Error}}</p>{{end}}
   <table>
     <thead>
-      <tr><th>Email</th><th>Role</th><th>Status</th><th></th></tr>
+      <tr><th>Email</th><th>Role</th><th>Status</th><th>Door access</th><th></th></tr>
     </thead>
     <tbody>
       {{range .Users}}{{template "user-row" .}}{{end}}
@@ -24,6 +24,26 @@
     {{end}}
   </td>
   <td>
+    {{if .PermanentAccess}}
+      <ins>Always allowed</ins>
+    {{else}}
+      <mark>Only during listed times</mark>
+    {{end}}
+  </td>
+  <td>
+    {{if .PermanentAccess}}
+      <button class="secondary outline"
+              hx-post="/htmx/admin/users/{{.ID}}/scheduled-access"
+              hx-target="#user-{{.ID}}"
+              hx-swap="outerHTML"
+              hx-confirm="{{.Email}} will only be able to enter during saved time windows. Continue?">Use scheduled times</button>
+    {{else}}
+      <button class="secondary outline"
+              hx-post="/htmx/admin/users/{{.ID}}/permanent-access"
+              hx-target="#user-{{.ID}}"
+              hx-swap="outerHTML"
+              hx-confirm="{{.Email}} will be allowed to enter at any time. Continue?">Allow anytime</button>
+    {{end}}
     {{if .Active}}
       <button class="secondary outline"
               hx-post="/htmx/admin/users/{{.ID}}/deactivate"

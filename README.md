@@ -8,6 +8,8 @@ just card reads, door open/deny, and card pairing for a single door.
 ## What it does
 
 - **Admins** register and deactivate users and review access logs.
+- **Admins** can set people to always-allowed or time-limited entry, and manage
+  multiple scheduled entry windows.
 - **Users** pair cards to themselves from the web UI and manage their labels.
 - A **door controller** (cardreader hardware) connects over MQTT. When a card
   is read, the server decides open or deny and replies to the controller. All
@@ -55,6 +57,7 @@ All configuration is via environment variables:
 | `BELEPTETO_CONTROLLER_ID` | `1619` | ID of the door controller this instance talks to |
 | `BELEPTETO_ADMIN_EMAIL` | `admin@example.com` | Email for the seeded admin |
 | `BELEPTETO_ADMIN_PASSWORD` | _(random)_ | Password for the seeded admin; random if unset |
+| `EXTERNAL_API_ACCESS_TOKEN` | _(disabled)_ | Bearer token required by the external access API |
 | `ISSUER_URL` | _(unset)_ | OIDC issuer URL; may be used instead of `WELL_KNOWN_URL` |
 | `WELL_KNOWN_URL` | _(unset)_ | Explicit OIDC discovery document URL; may be used instead of `ISSUER_URL` |
 | `CLIENT_ID` | _(unset)_ | Manually registered OIDC client ID |
@@ -63,6 +66,10 @@ All configuration is via environment variables:
 | `SSO_REDIRECT_URL` | _(unset)_ | Exact callback URL registered with the identity provider |
 | `SSO_FRONTEND_URL` | _(unset)_ | Public frontend origin; successful SSO returns to its `/` path |
 | `LOGIN_BUTTON_TEXT` | `Bejelentkezés SSO-val` | Optional text for the SSO login button |
+
+The external API is disabled when `EXTERNAL_API_ACCESS_TOKEN` is empty. Set a
+long, random secret and send it in the `Authorization: Bearer <token>` header.
+Do not put the token in a URL or request body. Expose the API over HTTPS.
 
 SSO is disabled when none of its core settings are set. If any are set, the
 configuration must be complete; the application reports an error on startup for
@@ -121,8 +128,60 @@ An unregistered card yields `deny 42`; a card paired to an active user yields
    and other formatting are significant. The card is stored in uppercase
    colon-hex form.
 3. If any scanned card belongs to an active card owned by an active user, the
-   server publishes `open <id>` and records an **entry**. Otherwise it publishes
-   `deny <id>`. Every scan is recorded as a **card read**.
+   server checks that user's door access. Always-allowed users can enter at any
+   time; time-limited users need a current entry window (`valid_from <= now <
+   valid_until`). The server then publishes `open <id>` and records an **entry**,
+   or publishes `deny <id>`. Every scan is recorded as a **card read**.
+
+## Time-limited entry
+
+Admins can add several independent entry windows for one person from the Admin
+page. Existing users remain always allowed unless an admin changes their
+setting to **Only during listed times**. Adding a time window does not change
+that setting. Windows use the server's local time in the web form; the API uses
+RFC 3339 timestamps with an explicit timezone. The end of a window is exclusive.
+
+### External API
+
+`PUT /api/v1/access-grant-sets` replaces the complete desired list for one
+generic source/scope pair. It is intended for systems that may retry or miss
+updates: each `source`/`scope_ref` pair has a monotonically increasing
+`revision`, and an omitted entry is revoked. The full update is validated and
+applied atomically. All emails must match active, existing users; this API does
+not create people or accounts.
+The API does not change a person's always-allowed setting. The response calls
+out users who already have always-allowed access.
+The sending system should retry until it receives a successful response and
+periodically resend its latest full snapshot; replaying the same revision and
+content is safe and reconciles the saved list.
+
+```sh
+curl -X PUT http://localhost:8080/api/v1/access-grant-sets \
+  -H 'Authorization: Bearer YOUR_EXTERNAL_API_ACCESS_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "source": "booking-system",
+    "scope_ref": "access-list-123",
+    "revision": 1,
+    "grants": [
+      {
+        "external_ref": "registration-456",
+        "email": "person@example.com",
+        "valid_from": "2026-11-10T17:00:00+01:00",
+        "valid_until": "2026-11-10T22:00:00+01:00"
+      }
+    ]
+  }'
+```
+
+Retry the same revision with the same content safely. Reusing a revision with
+different content or sending an older revision returns `409 Conflict`. To
+remove every entry in a scope, send a newer revision with an empty `grants`
+array. Read the last applied state with
+`GET /api/v1/access-grant-sets?source=booking-system&scope_ref=access-list-123`,
+using the same bearer header. A successful retry reports
+`"revision_advanced": false`; this does not prevent the server from reconciling
+the snapshot again.
 
 ## Card pairing
 

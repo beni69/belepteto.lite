@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -65,6 +66,68 @@ func TestUserByEmailNotFound(t *testing.T) {
 	_, err := store.UserByEmail("nobody@example.com")
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}
+
+func TestUserByEmailIgnoresCaseAndWhitespace(t *testing.T) {
+	store := newTestStore(t)
+	user := &User{Email: "person@example.com", PasswordHash: "h", Active: true}
+	if err := store.CreateUser(user); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	got, err := store.UserByEmail("  PERSON@Example.com ")
+	if err != nil {
+		t.Fatalf("UserByEmail: %v", err)
+	}
+	if got.ID != user.ID {
+		t.Fatalf("user id = %d, want %d", got.ID, user.ID)
+	}
+}
+
+func TestScheduledAccessGrantUsesHalfOpenWindowAndRevocation(t *testing.T) {
+	store := newTestStore(t)
+	user := &User{Email: "scheduled@example.com", PasswordHash: "h", Active: true}
+	if err := store.CreateUser(user); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	if err := store.SetUserPermanentAccess(user.ID, false); err != nil {
+		t.Fatalf("set scheduled access: %v", err)
+	}
+	from := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
+	until := from.Add(time.Hour)
+	if err := store.CreateManualAccessGrant(user.ID, from, until); err != nil {
+		t.Fatalf("create grant: %v", err)
+	}
+
+	checks := []struct {
+		at   time.Time
+		want bool
+	}{
+		{at: from.Add(-time.Second), want: false},
+		{at: from, want: true},
+		{at: until.Add(-time.Second), want: true},
+		{at: until, want: false},
+	}
+	for _, check := range checks {
+		got, err := store.HasActiveAccessGrant(user.ID, check.at)
+		if err != nil {
+			t.Fatalf("HasActiveAccessGrant(%s): %v", check.at, err)
+		}
+		if got != check.want {
+			t.Errorf("HasActiveAccessGrant(%s) = %v, want %v", check.at, got, check.want)
+		}
+	}
+
+	grants, err := store.ListVisibleAccessGrants(from)
+	if err != nil || len(grants) != 1 {
+		t.Fatalf("visible grants = %d, err = %v; want 1 grant", len(grants), err)
+	}
+	if err := store.RevokeAccessGrant(grants[0].ID, from); err != nil {
+		t.Fatalf("revoke grant: %v", err)
+	}
+	if got, err := store.HasActiveAccessGrant(user.ID, from.Add(time.Minute)); err != nil || got {
+		t.Fatalf("revoked grant active = %v, err = %v; want false", got, err)
 	}
 }
 
@@ -157,8 +220,10 @@ func TestOIDCLinkRejectsMissingInactiveAndAmbiguousLocalUsers(t *testing.T) {
 
 	t.Run("ambiguous case-insensitive email", func(t *testing.T) {
 		store := newTestStore(t)
+		// Legacy databases can contain case variants even though new accounts
+		// normalize email addresses before insertion.
 		for _, email := range []string{"Person@example.com", "person@example.com"} {
-			if err := store.CreateUser(&User{Email: email, PasswordHash: "hash", Active: true}); err != nil {
+			if err := store.db.Create(&User{Email: email, PasswordHash: "hash", Active: true}).Error; err != nil {
 				t.Fatalf("create %q: %v", email, err)
 			}
 		}
