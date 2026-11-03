@@ -20,6 +20,10 @@
         {{if .Error}}<small style="color: var(--pico-del-color);">{{.Error}}</small>{{end}}
         <button type="submit">Log in</button>
       </form>
+      {{if .SSOEnabled}}
+      <hr>
+      <a href="/sso/login" role="button" class="secondary" style="display: block; text-align: center;">{{.SSOButtonText}}</a>
+      {{end}}
     </article>
   </main>
 </body>

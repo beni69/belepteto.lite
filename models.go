@@ -3,12 +3,14 @@ package main
 import "time"
 
 type User struct {
-	ID              uint   `gorm:"primaryKey"`
-	Email           string `gorm:"uniqueIndex;not null"`
-	PasswordHash    string `gorm:"not null"`
-	Admin           bool   `gorm:"not null;default:false"`
-	Active          bool   `gorm:"not null;default:true"`
-	PermanentAccess bool   `gorm:"not null;default:true"`
+	ID              uint    `gorm:"primaryKey"`
+	Email           string  `gorm:"uniqueIndex;not null"`
+	PasswordHash    string  `gorm:"not null"`
+	OIDCIssuer      *string `gorm:"column:oidc_issuer;uniqueIndex:idx_users_oidc_identity,priority:1"`
+	OIDCSubject     *string `gorm:"column:oidc_subject;uniqueIndex:idx_users_oidc_identity,priority:2"`
+	Admin           bool    `gorm:"not null;default:false"`
+	Active          bool    `gorm:"not null;default:true"`
+	PermanentAccess bool    `gorm:"not null;default:true"`
 	CreatedAt       time.Time
 	Cards           []Card        `gorm:"constraint:OnDelete:CASCADE"`
 	Sessions        []Session     `gorm:"constraint:OnDelete:CASCADE"`
@@ -39,9 +41,9 @@ type Card struct {
 type AccessGrant struct {
 	ID uint `gorm:"primaryKey"`
 
-	UserID     uint      `gorm:"not null;index:idx_access_grant_window,priority:1"`
-	ValidFrom  time.Time `gorm:"not null;index:idx_access_grant_window,priority:2"`
-	ValidUntil time.Time `gorm:"not null"`
+	UserID     uint       `gorm:"not null;index:idx_access_grant_window,priority:1"`
+	ValidFrom  time.Time  `gorm:"not null;index:idx_access_grant_window,priority:2"`
+	ValidUntil time.Time  `gorm:"not null"`
 	RevokedAt  *time.Time `gorm:"index"`
 
 	ExternalSource *string `gorm:"uniqueIndex:idx_access_grant_external,priority:1;index:idx_access_grant_scope,priority:1"`

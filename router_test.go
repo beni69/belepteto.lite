@@ -18,7 +18,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	}
 	store := newTestStore(t)
 	access := newTestAccess(t, store)
-	srv := httptest.NewServer(newRouter(logger, tmpl, store, access))
+	srv := httptest.NewServer(newRouter(logger, tmpl, store, access, "", nil))
 	t.Cleanup(srv.Close)
 	return srv
 }
@@ -69,6 +69,9 @@ func TestLoginPageRenders(t *testing.T) {
 	}
 	if !strings.Contains(string(body), "Log in to continue") {
 		t.Errorf("login page missing expected content")
+	}
+	if strings.Contains(string(body), defaultSSOLoginButtonText) || strings.Contains(string(body), "/sso/login") {
+		t.Errorf("SSO button should be hidden when SSO is not configured")
 	}
 }
 

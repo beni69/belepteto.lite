@@ -34,8 +34,8 @@ func TestAdminCanCreateAndManageScheduledEntryTimes(t *testing.T) {
 	from := time.Now().In(time.Local).Add(time.Hour).Truncate(time.Minute)
 	until := from.Add(2 * time.Hour)
 	resp, err = admin.PostForm(srv.URL+"/htmx/admin/access-grants", url.Values{
-		"user_id":    {stringID(person.ID)},
-		"valid_from": {from.Format("2006-01-02T15:04")},
+		"user_id":     {stringID(person.ID)},
+		"valid_from":  {from.Format("2006-01-02T15:04")},
 		"valid_until": {until.Format("2006-01-02T15:04")},
 	})
 	if err != nil {
@@ -102,7 +102,7 @@ func TestAdminCanCreateAndManageScheduledEntryTimes(t *testing.T) {
 }
 
 func TestNonAdminCannotManageScheduledEntryTimes(t *testing.T) {
-	srv, _ := authTestServer(t)
+	srv, store := authTestServer(t)
 	seedUser(t, store, "person@example.com", "pw", false)
 	user := login(t, srv, "person@example.com", "pw")
 	resp, err := user.PostForm(srv.URL+"/htmx/admin/access-grants", url.Values{

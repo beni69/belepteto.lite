@@ -43,7 +43,7 @@ func (s *server) startSession(w http.ResponseWriter, r *http.Request, userID uin
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil,
+		Secure:   s.secureCookies(r),
 		Expires:  sess.ExpiresAt,
 	})
 	return nil
@@ -58,8 +58,13 @@ func (s *server) clearSession(w http.ResponseWriter, r *http.Request) {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   s.secureCookies(r),
 		MaxAge:   -1,
 	})
+}
+
+func (s *server) secureCookies(r *http.Request) bool {
+	return r.TLS != nil || (s.sso != nil && s.sso.secureCookies)
 }
 
 func (s *server) currentUser(r *http.Request) *User {

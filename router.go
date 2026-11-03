@@ -17,14 +17,18 @@ type server struct {
 	store            *Store
 	access           *AccessService
 	externalAPIToken string
+	sso              *oidcAuthenticator
 }
 
-func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *AccessService, externalAPITokens ...string) http.Handler {
-	externalAPIToken := ""
-	if len(externalAPITokens) > 0 {
-		externalAPIToken = externalAPITokens[0]
+func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *AccessService, externalAPIToken string, sso *oidcAuthenticator) http.Handler {
+	s := &server{
+		logger:           logger,
+		tmpl:             tmpl,
+		store:            store,
+		access:           access,
+		externalAPIToken: externalAPIToken,
+		sso:              sso,
 	}
-	s := &server{logger: logger, tmpl: tmpl, store: store, access: access, externalAPIToken: externalAPIToken}
 
 	r := chi.NewRouter()
 
@@ -50,6 +54,10 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *Acces
 	r.Get("/login", s.handleLoginPage)
 	r.Post("/login", s.handleLoginSubmit)
 	r.Post("/logout", s.handleLogout)
+	if s.sso != nil {
+		r.Get("/sso/login", s.handleOIDCLogin)
+		r.Get(s.sso.callbackPath, s.handleOIDCCallback)
+	}
 
 	// Authenticated pages.
 	r.Group(func(r chi.Router) {

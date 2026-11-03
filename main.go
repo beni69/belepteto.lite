@@ -13,6 +13,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 type config struct {
@@ -23,6 +25,7 @@ type config struct {
 	mqttAddr               string
 	controllerID           string
 	externalAPIAccessToken string
+	sso                    ssoConfig
 }
 
 func loadConfig() config {
@@ -34,6 +37,16 @@ func loadConfig() config {
 		mqttAddr:               envOr("BELEPTETO_MQTT_ADDR", ":1883"),
 		controllerID:           envOr("BELEPTETO_CONTROLLER_ID", "1619"),
 		externalAPIAccessToken: strings.TrimSpace(os.Getenv("EXTERNAL_API_ACCESS_TOKEN")),
+		sso: ssoConfig{
+			issuerURL:       os.Getenv("ISSUER_URL"),
+			wellKnownURL:    os.Getenv("WELL_KNOWN_URL"),
+			clientID:        os.Getenv("CLIENT_ID"),
+			clientSecret:    os.Getenv("CLIENT_SECRET"),
+			scopes:          os.Getenv("SCOPES"),
+			redirectURL:     os.Getenv("SSO_REDIRECT_URL"),
+			frontendURL:     os.Getenv("SSO_FRONTEND_URL"),
+			loginButtonText: envOr("LOGIN_BUTTON_TEXT", defaultSSOLoginButtonText),
+		},
 	}
 }
 
@@ -86,11 +99,25 @@ func logLevel() slog.Level {
 }
 
 func main() {
+	if err := loadDotEnv(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel()}))
 	if err := run(logger); err != nil {
 		logger.Error("server exited with error", "err", err)
 		os.Exit(1)
 	}
+}
+
+// loadDotEnv loads local development configuration when .env is present.
+// Process environment variables take precedence over values from the file.
+func loadDotEnv() error {
+	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("load .env: %w", err)
+	}
+	return nil
 }
 
 func run(logger *slog.Logger) error {
@@ -111,6 +138,11 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
+	sso, err := newOIDCAuthenticator(context.Background(), cfg.sso, nil)
+	if err != nil {
+		return fmt.Errorf("configure OIDC SSO: %w", err)
+	}
+
 	broker, err := NewBroker(logger, cfg.mqttAddr)
 	if err != nil {
 		return err
@@ -128,7 +160,7 @@ func run(logger *slog.Logger) error {
 
 	srv := &http.Server{
 		Addr:              cfg.httpAddr,
-		Handler:           newRouter(logger, tmpl, store, access, cfg.externalAPIAccessToken),
+		Handler:           newRouter(logger, tmpl, store, access, cfg.externalAPIAccessToken, sso),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

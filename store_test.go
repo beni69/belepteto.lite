@@ -2,16 +2,26 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
-	store, err := OpenStore(":memory:")
+	// Transactions may use a different pooled SQLite connection. A uniquely
+	// named shared in-memory database keeps the schema visible on every one.
+	store, err := OpenStore(fmt.Sprintf("file:%s?mode=memory&cache=shared", uuid.NewString()))
 	if err != nil {
 		t.Fatalf("OpenStore: %v", err)
 	}
+	db, err := store.db.DB()
+	if err != nil {
+		t.Fatalf("get sql DB: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
 	return store
 }
 
@@ -158,4 +168,67 @@ func TestSetUserActiveNotFound(t *testing.T) {
 	if err := store.SetUserActive(9999, false); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("want ErrNotFound, got %v", err)
 	}
+}
+
+func TestLinkOIDCIdentityToExistingActiveUser(t *testing.T) {
+	store := newTestStore(t)
+	u := &User{Email: "Person@Example.com", PasswordHash: "hash", Active: true}
+	if err := store.CreateUser(u); err != nil {
+		t.Fatalf("create local user: %v", err)
+	}
+	linked, err := store.LinkOIDCIdentity("https://issuer.example", "subject-1", "person@example.com")
+	if err != nil {
+		t.Fatalf("link identity: %v", err)
+	}
+	if linked.ID != u.ID || linked.OIDCIssuer == nil || *linked.OIDCIssuer != "https://issuer.example" ||
+		linked.OIDCSubject == nil || *linked.OIDCSubject != "subject-1" {
+		t.Fatalf("unexpected linked user: %+v", linked)
+	}
+
+	got, err := store.UserByOIDCIdentity("https://issuer.example", "subject-1")
+	if err != nil || got.ID != u.ID {
+		t.Fatalf("lookup linked identity = (%+v, %v), want user %d", got, err, u.ID)
+	}
+
+	// A different identity cannot take over the account after the first link.
+	if _, err := store.LinkOIDCIdentity("https://issuer.example", "subject-2", "person@example.com"); !errors.Is(err, ErrOIDCIdentityConflict) {
+		t.Fatalf("second subject link error = %v, want ErrOIDCIdentityConflict", err)
+	}
+}
+
+func TestOIDCLinkRejectsMissingInactiveAndAmbiguousLocalUsers(t *testing.T) {
+	t.Run("unknown email", func(t *testing.T) {
+		store := newTestStore(t)
+		if _, err := store.LinkOIDCIdentity("issuer", "subject", "missing@example.com"); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("link error = %v, want ErrNotFound", err)
+		}
+	})
+
+	t.Run("inactive user", func(t *testing.T) {
+		store := newTestStore(t)
+		u := &User{Email: "inactive@example.com", PasswordHash: "hash", Active: false}
+		if err := store.CreateUser(u); err != nil {
+			t.Fatalf("create local user: %v", err)
+		}
+		if err := store.SetUserActive(u.ID, false); err != nil {
+			t.Fatalf("deactivate local user: %v", err)
+		}
+		if _, err := store.LinkOIDCIdentity("issuer", "subject", u.Email); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("link error = %v, want ErrNotFound", err)
+		}
+	})
+
+	t.Run("ambiguous case-insensitive email", func(t *testing.T) {
+		store := newTestStore(t)
+		// Legacy databases can contain case variants even though new accounts
+		// normalize email addresses before insertion.
+		for _, email := range []string{"Person@example.com", "person@example.com"} {
+			if err := store.db.Create(&User{Email: email, PasswordHash: "hash", Active: true}).Error; err != nil {
+				t.Fatalf("create %q: %v", email, err)
+			}
+		}
+		if _, err := store.LinkOIDCIdentity("issuer", "subject", "PERSON@example.com"); !errors.Is(err, ErrAmbiguousEmail) {
+			t.Fatalf("link error = %v, want ErrAmbiguousEmail", err)
+		}
+	})
 }

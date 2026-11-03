@@ -58,10 +58,32 @@ All configuration is via environment variables:
 | `BELEPTETO_ADMIN_EMAIL` | `admin@example.com` | Email for the seeded admin |
 | `BELEPTETO_ADMIN_PASSWORD` | _(random)_ | Password for the seeded admin; random if unset |
 | `EXTERNAL_API_ACCESS_TOKEN` | _(disabled)_ | Bearer token required by the external access API |
+| `ISSUER_URL` | _(unset)_ | OIDC issuer URL; may be used instead of `WELL_KNOWN_URL` |
+| `WELL_KNOWN_URL` | _(unset)_ | Explicit OIDC discovery document URL; may be used instead of `ISSUER_URL` |
+| `CLIENT_ID` | _(unset)_ | Manually registered OIDC client ID |
+| `CLIENT_SECRET` | _(unset)_ | Manually registered OIDC client secret |
+| `SCOPES` | _(unset)_ | Space-separated OIDC scopes; must include `openid email` |
+| `SSO_REDIRECT_URL` | _(unset)_ | Exact callback URL registered with the identity provider |
+| `SSO_FRONTEND_URL` | _(unset)_ | Public frontend origin; successful SSO returns to its `/` path |
+| `LOGIN_BUTTON_TEXT` | `Bejelentkezés SSO-val` | Optional text for the SSO login button |
 
 The external API is disabled when `EXTERNAL_API_ACCESS_TOKEN` is empty. Set a
 long, random secret and send it in the `Authorization: Bearer <token>` header.
 Do not put the token in a URL or request body. Expose the API over HTTPS.
+
+SSO is disabled when none of its core settings are set. If any are set, the
+configuration must be complete; the application reports an error on startup for
+partial or invalid configuration. Configure an OIDC client manually with the
+authorization-code grant and `RS256` ID-token signing. `SSO_REDIRECT_URL` must
+match the registered callback exactly, and it must share an origin with
+`SSO_FRONTEND_URL` so the session cookie remains available after the redirect.
+When both discovery variables are set, the document at `WELL_KNOWN_URL` is used
+and its issuer must exactly match `ISSUER_URL`. If only `ISSUER_URL` is set, the
+standard `/.well-known/openid-configuration` path is used.
+
+SSO only links an identity to an existing active local account; it does not
+create users. The first login requires a verified email claim matching that
+account. Later logins use the issuer and OIDC `sub` saved on the local user.
 
 ## Connecting a controller
 
@@ -179,4 +201,4 @@ Users add cards by pairing, not by typing a UID:
 This is the "lite" build. The following parts of the full protocol/system are
 intentionally left out and may be added later: remote (button) door opening,
 heartbeat/syslog/doorState telemetry, controller DB sync (`dbControl`/`dbPush`),
-backend healthcheck, OAuth login, and mutual-TLS/ACL on the broker.
+and mutual-TLS/ACL on the broker.
