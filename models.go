@@ -26,13 +26,17 @@ type Session struct {
 
 type Card struct {
 	ID uint `gorm:"primaryKey"`
-	// stores the reader's colon-hex form in uppercase
-	// "AA:BB:CC:DD:00:00:00:00"
-	CardUID   string `gorm:"uniqueIndex;not null"`
-	UserID    uint   `gorm:"index;not null"`
-	Label     string
-	Active    bool `gorm:"not null;default:true"`
-	CreatedAt time.Time
+	// CardUID stores the SHA-256 hash of the normalized reader UID. The raw UID
+	// is never persisted in this field.
+	CardUID string `gorm:"uniqueIndex;not null"`
+	// CardUIDPrefix contains the first two characters of the normalized UID for
+	// display in the frontend. It is intentionally stored separately because a
+	// one-way hash cannot recover a display prefix.
+	CardUIDPrefix string `gorm:"column:card_uid_prefix"`
+	UserID        uint   `gorm:"index;not null"`
+	Label         string
+	Active        bool `gorm:"not null;default:true"`
+	CreatedAt     time.Time
 }
 
 // AccessGrant allows a user to enter during one half-open time interval:
@@ -67,16 +71,25 @@ type AccessGrantSync struct {
 }
 
 type CardRead struct {
-	ID        uint   `gorm:"primaryKey"`
-	CardUID   string `gorm:"index;not null"`
-	UserID    *uint  `gorm:"index"`
-	Accepted  bool   `gorm:"not null"`
-	CreatedAt time.Time
+	ID uint `gorm:"primaryKey"`
+	// CardUID stores the SHA-256 hash of the normalized reader UID.
+	CardUID string `gorm:"index;not null"`
+	// CardUIDPrefix contains the first two characters of the normalized UID for
+	// the admin log, without exposing the hash or raw UID.
+	CardUIDPrefix string `gorm:"column:card_uid_prefix"`
+	UserID        *uint  `gorm:"index"`
+	Accepted      bool   `gorm:"not null"`
+	CreatedAt     time.Time
 }
 
 type Entry struct {
-	ID        uint    `gorm:"primaryKey"`
-	UserID    uint    `gorm:"index;not null"`
-	CardUID   *string `gorm:"index"`
-	CreatedAt time.Time
+	ID     uint `gorm:"primaryKey"`
+	UserID uint `gorm:"index;not null"`
+	// CardUID is nil for entries opened without a card. When present, it stores
+	// the SHA-256 hash of the normalized reader UID.
+	CardUID *string `gorm:"index"`
+	// CardUIDPrefix is nil when CardUID is nil and otherwise contains the first
+	// two characters of the normalized UID for the admin log.
+	CardUIDPrefix *string `gorm:"column:card_uid_prefix"`
+	CreatedAt     time.Time
 }

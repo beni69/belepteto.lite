@@ -11,13 +11,13 @@
   {{if .Rows}}
   <table>
     <thead>
-      <tr><th>Time</th><th>Card UID</th><th>User</th><th>Result</th></tr>
+      <tr><th>Time</th><th>Card UID prefix</th><th>User</th><th>Result</th></tr>
     </thead>
     <tbody>
       {{range .Rows}}
       <tr>
         <td>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
-        <td><code>{{.CardUID}}</code></td>
+        <td><code>{{.CardUIDPrefix}}</code></td>
         <td>{{if .Email}}{{.Email}}{{else}}<i>unknown</i>{{end}}</td>
         <td>{{if .Accepted}}<ins>Accepted</ins>{{else}}<del>Denied</del>{{end}}</td>
       </tr>

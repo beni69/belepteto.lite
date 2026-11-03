@@ -125,8 +125,10 @@ An unregistered card yields `deny 42`; a card paired to an active user yields
 1. The reader publishes a `cardRead` (one or more cards, a correlation `id`).
 2. The server uppercases each UID and looks it up exactly as received otherwise.
    Reader UIDs are expected in colon-separated hexadecimal form, so separators
-   and other formatting are significant. The card is stored in uppercase
-   colon-hex form.
+   and other formatting are significant. The normalized UID is stored as a
+   deterministic SHA-256 hash. The first two normalized characters are stored
+   separately so the frontend can identify a card without receiving the full
+   UID or its hash.
 3. If any scanned card belongs to an active card owned by an active user, the
    server checks that user's door access. Always-allowed users can enter at any
    time; time-limited users need a current entry window (`valid_from <= now <

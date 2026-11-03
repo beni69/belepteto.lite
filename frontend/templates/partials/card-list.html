@@ -4,16 +4,16 @@
   {{if .Cards}}
   <table>
     <thead>
-      <tr><th>Card UID</th><th>Label</th><th></th></tr>
+      <tr><th>Card UID prefix</th><th>Label</th><th></th></tr>
     </thead>
     <tbody>
       {{range .Cards}}
       <tr>
-        <td><code>{{.CardUID}}</code></td>
+        <td><code>{{.CardUIDPrefix}}</code></td>
         <td>
           <form hx-post="/htmx/cards/{{.ID}}/relabel" hx-target="#card-list" hx-swap="outerHTML">
             <input type="text" name="label" value="{{.Label}}" placeholder="Label"
-                   aria-label="Label for card {{.CardUID}}"
+                   aria-label="Label for card {{.CardUIDPrefix}}"
                    hx-trigger="change">
           </form>
         </td>

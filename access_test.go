@@ -216,8 +216,9 @@ func TestPairingHappyPath(t *testing.T) {
 		return f.access.PairingStatusFor(u.ID).State == PairingPaired
 	})
 	cards, _ := f.store.CardsByUser(u.ID)
-	if len(cards) != 1 || cards[0].CardUID != "AA:BB:CC:DD:EE:FF:00:00" {
-		t.Fatalf("card not stored in uppercase colon-hex form: %+v", cards)
+	wantHash := hashCardUID("AA:BB:CC:DD:EE:FF:00:00")
+	if len(cards) != 1 || cards[0].CardUID != wantHash || cards[0].CardUIDPrefix != "AA" {
+		t.Fatalf("card not stored as a hash with a safe prefix: %+v", cards)
 	}
 	if cards[0].Label != "" {
 		t.Errorf("paired card should have empty label, got %q", cards[0].Label)

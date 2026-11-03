@@ -63,6 +63,12 @@ func (s *server) handleCardRelabel(w http.ResponseWriter, r *http.Request) {
 	s.renderCardList(w, u.ID, "")
 }
 
+type cardListView struct {
+	ID            uint
+	CardUIDPrefix string
+	Label         string
+}
+
 func (s *server) renderCardList(w http.ResponseWriter, userID uint, errMsg string) {
 	cards, err := s.store.CardsByUser(userID)
 	if err != nil {
@@ -70,7 +76,15 @@ func (s *server) renderCardList(w http.ResponseWriter, userID uint, errMsg strin
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	data := map[string]any{"Cards": cards}
+	views := make([]cardListView, 0, len(cards))
+	for _, card := range cards {
+		views = append(views, cardListView{
+			ID:            card.ID,
+			CardUIDPrefix: card.CardUIDPrefix,
+			Label:         card.Label,
+		})
+	}
+	data := map[string]any{"Cards": views}
 	if errMsg != "" {
 		data["Error"] = errMsg
 	}

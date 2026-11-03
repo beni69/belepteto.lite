@@ -254,7 +254,7 @@ func (a *AccessService) handlePairingRead(userID uint, msg CardReadMsg) {
 		return
 	}
 	a.setResult(userID, PairingStatus{State: PairingPaired, Message: "Card paired successfully."})
-	a.logger.Info("card paired", "user", userID, "uid", uid)
+	a.logger.Info("card paired", "user", userID, "uid_prefix", cardUIDPrefix(uid))
 }
 
 // endPairing clears the active session and its timer, then turns the reader
