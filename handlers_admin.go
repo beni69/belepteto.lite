@@ -53,6 +53,61 @@ func (s *server) handleAdminUserActivate(w http.ResponseWriter, r *http.Request)
 	s.setUserActive(w, r, true)
 }
 
+// handleAdminUserPairStart puts the reader into pairing mode for the selected
+// user. The next card read will be assigned to that user's account.
+func (s *server) handleAdminUserPairStart(w http.ResponseWriter, r *http.Request) {
+	user, ok := s.adminPairingUser(w, r)
+	if !ok {
+		return
+	}
+
+	s.access.StartPairing(user.ID)
+	s.renderAdminPairStatus(w, user.ID)
+}
+
+// handleAdminUserPairStatus is polled while the selected user's pairing is in
+// progress.
+func (s *server) handleAdminUserPairStatus(w http.ResponseWriter, r *http.Request) {
+	user, ok := s.adminPairingUser(w, r)
+	if !ok {
+		return
+	}
+
+	s.renderAdminPairStatus(w, user.ID)
+}
+
+func (s *server) adminPairingUser(w http.ResponseWriter, r *http.Request) (*User, bool) {
+	id, err := strconv.ParseUint(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "bad user id", http.StatusBadRequest)
+		return nil, false
+	}
+
+	user, err := s.store.UserByID(uint(id))
+	if errors.Is(err, ErrNotFound) {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return nil, false
+	}
+	if err != nil {
+		s.logger.Error("look up user for pairing", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return nil, false
+	}
+	return user, true
+}
+
+func (s *server) renderAdminPairStatus(w http.ResponseWriter, userID uint) {
+	st := s.access.PairingStatusFor(userID)
+	if err := s.tmpl.Fragment(w, "admin-pair-status", map[string]any{
+		"UserID":  userID,
+		"State":   string(st.State),
+		"Message": st.Message,
+	}); err != nil {
+		s.logger.Error("render admin pair-status", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+}
+
 func (s *server) setUserActive(w http.ResponseWriter, r *http.Request, active bool) {
 	id, err := strconv.ParseUint(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {

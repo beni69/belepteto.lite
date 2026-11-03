@@ -79,6 +79,8 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *Acces
 			r.Post("/htmx/admin/users", s.handleAdminUserCreate)
 			r.Post("/htmx/admin/users/{id}/activate", s.handleAdminUserActivate)
 			r.Post("/htmx/admin/users/{id}/deactivate", s.handleAdminUserDeactivate)
+			r.Post("/htmx/admin/users/{id}/pair", s.handleAdminUserPairStart)
+			r.Get("/htmx/admin/users/{id}/pair/status", s.handleAdminUserPairStatus)
 			r.Post("/htmx/admin/users/{id}/scheduled-access", s.handleAdminUserScheduledAccess)
 			r.Post("/htmx/admin/users/{id}/permanent-access", s.handleAdminUserPermanentAccess)
 
