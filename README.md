@@ -94,7 +94,8 @@ protocol:
 - **Subscribes** to `controller/{id}/cardRead` — card scans reported by the
   reader (a batch of cards with a correlation `id`).
 - **Publishes** to `controller/{id}/doorControl` — plaintext `open <id>`,
-  `deny <id>`, or `ignore <id>`, echoing the cardRead id.
+  `deny <id>`, or `ignore <id>` for card reads (echoing the cardRead id), plus
+  plain `open` for authorized remote opens from the signed-in web UI.
 - **Publishes** to `controller/{id}/command` — `alternativeColorOn` /
   `alternativeColorOff` to signal pairing mode on the reader.
 
@@ -134,6 +135,16 @@ An unregistered card yields `deny 42`; a card paired to an active user yields
    time; time-limited users need a current entry window (`valid_from <= now <
    valid_until`). The server then publishes `open <id>` and records an **entry**,
    or publishes `deny <id>`. Every scan is recorded as a **card read**.
+4. Signed-in users with current door access can also use the floating remote-open
+   control. It requires a two-press confirmation, and the server checks access
+   again immediately before publishing the plain `open` command. The web log
+   records the request as a remote entry; the success message confirms that the
+   broker accepted the request, not that the controller physically opened the
+   door.
+
+Admins can expand each person's card list to rename a card or unpair it. Unpairing
+removes that card assignment, so the card can be paired to another user later;
+the stored UID hash is never shown in the UI.
 
 ## Time-limited entry
 
@@ -142,6 +153,8 @@ page. Existing users remain always allowed unless an admin changes their
 setting to **Only during listed times**. Adding a time window does not change
 that setting. Windows use the server's local time in the web form; the API uses
 RFC 3339 timestamps with an explicit timezone. The end of a window is exclusive.
+When registering a user, admins can choose always-allowed or scheduled-only
+access; always-allowed is selected by default.
 
 ### External API
 

@@ -10,7 +10,43 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+type adminUserView struct {
+	ID              uint
+	Email           string
+	Admin           bool
+	Active          bool
+	PermanentAccess bool
+	CardsExpanded   bool
+	Cards           []adminCardView
+}
+
+type adminCardView struct {
+	ID            uint
+	CardUIDPrefix string
+	Label         string
+}
+
+func adminUserViewFor(user User) adminUserView {
+	view := adminUserView{
+		ID:              user.ID,
+		Email:           user.Email,
+		Admin:           user.Admin,
+		Active:          user.Active,
+		PermanentAccess: user.PermanentAccess,
+		Cards:           make([]adminCardView, 0, len(user.Cards)),
+	}
+	for _, card := range user.Cards {
+		view.Cards = append(view.Cards, adminCardView{
+			ID:            card.ID,
+			CardUIDPrefix: card.CardUIDPrefix,
+			Label:         card.Label,
+		})
+	}
+	return view
+}
+
 func (s *server) handleAdminUserList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	s.renderUserList(w, "")
 }
 
@@ -18,31 +54,62 @@ func (s *server) handleAdminUserCreate(w http.ResponseWriter, r *http.Request) {
 	email := strings.TrimSpace(r.FormValue("email"))
 	password := r.FormValue("password")
 	admin := r.FormValue("admin") != ""
+	permanentAccess := r.FormValue("permanent_access") == "on"
 
 	if email == "" || password == "" {
-		s.renderUserList(w, "Email and password are required.")
+		s.renderUserCreateResult(w, "", "Email and password are required.")
 		return
 	}
 
 	hash, err := HashPassword(password)
 	if err != nil {
 		s.logger.Error("hash password", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		s.renderUserCreateResult(w, "", "Could not prepare the user's password.")
 		return
 	}
 
-	err = s.store.CreateUser(&User{Email: email, PasswordHash: hash, Admin: admin, Active: true})
+	err = s.store.CreateUserWithAccess(&User{
+		Email:        email,
+		PasswordHash: hash,
+		Admin:        admin,
+		Active:       true,
+	}, permanentAccess)
 	if errors.Is(err, ErrDuplicate) {
-		s.renderUserList(w, "A user with that email already exists.")
+		s.renderUserCreateResult(w, "", "A user with that email already exists.")
 		return
 	}
 	if err != nil {
 		s.logger.Error("create user", "err", err)
-		s.renderUserList(w, "Could not create the user.")
+		s.renderUserCreateResult(w, "", "Could not create the user.")
 		return
 	}
 
-	s.renderUserList(w, "")
+	w.Header().Set("HX-Trigger", "user-created")
+	s.renderUserCreateResult(w, "User registered: "+email, "")
+}
+
+func (s *server) renderUserCreateResult(w http.ResponseWriter, success, errorMessage string) {
+	if err := s.tmpl.Fragment(w, "user-create-result", map[string]any{
+		"Success": success,
+		"Error":   errorMessage,
+	}); err != nil {
+		s.logger.Error("render user creation result", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+}
+
+func (s *server) handleAdminAccessGrantUsers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	users, err := s.store.ListUsers()
+	if err != nil {
+		s.logger.Error("list people for access-grant selector", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if err := s.tmpl.Fragment(w, "admin-access-grant-users", map[string]any{"Users": users}); err != nil {
+		s.logger.Error("render access-grant user selector", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
 }
 
 func (s *server) handleAdminUserDeactivate(w http.ResponseWriter, r *http.Request) {
@@ -96,6 +163,95 @@ func (s *server) adminPairingUser(w http.ResponseWriter, r *http.Request) (*User
 	return user, true
 }
 
+func (s *server) adminUserView(userID uint) (adminUserView, error) {
+	user, err := s.store.UserByID(userID)
+	if err != nil {
+		return adminUserView{}, err
+	}
+	cards, err := s.store.CardsByUser(userID)
+	if err != nil {
+		return adminUserView{}, err
+	}
+	user.Cards = cards
+	return adminUserViewFor(*user), nil
+}
+
+func (s *server) renderAdminUserCards(w http.ResponseWriter, userID uint) {
+	view, err := s.adminUserView(userID)
+	if errors.Is(err, ErrNotFound) {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		s.logger.Error("load admin user cards", "user", userID, "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	view.CardsExpanded = true
+	if err := s.tmpl.Fragment(w, "admin-user-cards", view); err != nil {
+		s.logger.Error("render admin user cards", "user", userID, "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+}
+
+func (s *server) handleAdminUserCards(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	userID, err := strconv.ParseUint(chi.URLParam(r, "userID"), 10, 64)
+	if err != nil || userID == 0 {
+		http.Error(w, "bad user id", http.StatusBadRequest)
+		return
+	}
+	s.renderAdminUserCards(w, uint(userID))
+}
+
+func (s *server) adminCardRouteIDs(w http.ResponseWriter, r *http.Request) (uint, uint, bool) {
+	userID, err := strconv.ParseUint(chi.URLParam(r, "userID"), 10, 64)
+	if err != nil || userID == 0 {
+		http.Error(w, "bad user id", http.StatusBadRequest)
+		return 0, 0, false
+	}
+	cardID, err := strconv.ParseUint(chi.URLParam(r, "cardID"), 10, 64)
+	if err != nil || cardID == 0 {
+		http.Error(w, "bad card id", http.StatusBadRequest)
+		return 0, 0, false
+	}
+	return uint(userID), uint(cardID), true
+}
+
+func (s *server) handleAdminCardRelabel(w http.ResponseWriter, r *http.Request) {
+	userID, cardID, ok := s.adminCardRouteIDs(w, r)
+	if !ok {
+		return
+	}
+	if err := s.store.RelabelUserCard(userID, cardID, strings.TrimSpace(r.FormValue("label"))); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			http.Error(w, "card not found", http.StatusNotFound)
+			return
+		}
+		s.logger.Error("admin relabel card", "user", userID, "card", cardID, "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	s.renderAdminUserCards(w, userID)
+}
+
+func (s *server) handleAdminCardDelete(w http.ResponseWriter, r *http.Request) {
+	userID, cardID, ok := s.adminCardRouteIDs(w, r)
+	if !ok {
+		return
+	}
+	if err := s.store.DeleteUserCard(userID, cardID); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			http.Error(w, "card not found", http.StatusNotFound)
+			return
+		}
+		s.logger.Error("admin unpair card", "user", userID, "card", cardID, "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	s.renderAdminUserCards(w, userID)
+}
+
 func (s *server) renderAdminPairStatus(w http.ResponseWriter, userID uint) {
 	st := s.access.PairingStatusFor(userID)
 	if err := s.tmpl.Fragment(w, "admin-pair-status", map[string]any{
@@ -141,15 +297,19 @@ func (s *server) setUserActive(w http.ResponseWriter, r *http.Request, active bo
 		}
 	}
 
-	user, err := s.store.UserByID(uint(id))
+	w.Header().Set("HX-Trigger", "user-updated")
+	s.renderAdminUserRow(w, uint(id))
+}
+
+func (s *server) renderAdminUserRow(w http.ResponseWriter, userID uint) {
+	view, err := s.adminUserView(userID)
 	if err != nil {
-		s.logger.Error("reload user", "err", err)
+		s.logger.Error("reload user row", "user", userID, "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-
-	if err := s.tmpl.Fragment(w, "user-row", user); err != nil {
-		s.logger.Error("render user-row", "err", err)
+	if err := s.tmpl.Fragment(w, "user-row", view); err != nil {
+		s.logger.Error("render user-row", "user", userID, "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 	}
 }
@@ -230,13 +390,17 @@ func (s *server) handleAdminCardReadLog(w http.ResponseWriter, r *http.Request) 
 // renderUserList renders the whole user list fragment, optionally with an error
 // message shown above the list.
 func (s *server) renderUserList(w http.ResponseWriter, errMsg string) {
-	users, err := s.store.ListUsers()
+	users, err := s.store.ListUsersWithCards()
 	if err != nil {
 		s.logger.Error("list users", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	data := map[string]any{"Users": users}
+	views := make([]adminUserView, 0, len(users))
+	for _, user := range users {
+		views = append(views, adminUserViewFor(user))
+	}
+	data := map[string]any{"Users": views}
 	if errMsg != "" {
 		data["Error"] = errMsg
 	}

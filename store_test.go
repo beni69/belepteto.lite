@@ -62,6 +62,33 @@ func TestCreateAndReadUserWithCard(t *testing.T) {
 	}
 }
 
+func TestCreateUserWithAccessChoice(t *testing.T) {
+	store := newTestStore(t)
+
+	scheduled := &User{Email: "scheduled@example.com", PasswordHash: "hash", Active: true}
+	if err := store.CreateUserWithAccess(scheduled, false); err != nil {
+		t.Fatalf("create scheduled-only user: %v", err)
+	}
+	if scheduled.PermanentAccess {
+		t.Fatal("created user should be scheduled-only")
+	}
+	reloaded, err := store.UserByID(scheduled.ID)
+	if err != nil {
+		t.Fatalf("reload scheduled-only user: %v", err)
+	}
+	if reloaded.PermanentAccess {
+		t.Fatal("scheduled-only setting was not persisted")
+	}
+
+	legacyDefault := &User{Email: "default@example.com", PasswordHash: "hash", Active: true}
+	if err := store.CreateUser(legacyDefault); err != nil {
+		t.Fatalf("create with legacy default: %v", err)
+	}
+	if !legacyDefault.PermanentAccess {
+		t.Fatal("CreateUser should retain the always-allowed default")
+	}
+}
+
 func TestUserByEmailNotFound(t *testing.T) {
 	store := newTestStore(t)
 	_, err := store.UserByEmail("nobody@example.com")

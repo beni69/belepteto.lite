@@ -1,0 +1,7 @@
+{{define "user-create-result"}}
+{{if .Error}}
+  <p class="notice-error" role="alert">{{.Error}}</p>
+{{else if .Success}}
+  <p class="status-message status-success" role="status"><svg class="icon" aria-hidden="true"><use href="#icon-check-circle"></use></svg>{{.Success}}</p>
+{{end}}
+{{end}}

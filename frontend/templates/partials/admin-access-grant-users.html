@@ -1,0 +1,16 @@
+{{define "admin-access-grant-users"}}
+<div id="grant-user-select" class="grant-user-select" hx-get="/htmx/admin/access-grant-users"
+     hx-trigger="user-created from:body, user-updated from:body" hx-swap="outerHTML" hx-sync="this:replace">
+  <label>
+    Person
+    <select name="user_id" required>
+      <option value="">Choose a person</option>
+      {{range .Users}}
+        {{if .Active}}
+          <option value="{{.ID}}">{{.Email}}{{if .PermanentAccess}} — always allowed{{else}} — scheduled times only{{end}}</option>
+        {{end}}
+      {{end}}
+    </select>
+  </label>
+</div>
+{{end}}

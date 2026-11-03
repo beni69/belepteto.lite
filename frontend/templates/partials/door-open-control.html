@@ -1,0 +1,15 @@
+{{define "door-open-control"}}
+<div id="door-open-control" class="door-open-layer"
+     hx-get="/htmx/door-open-control" hx-trigger="every 15s" hx-swap="outerHTML">
+  {{if .CanOpenDoor}}
+    <div class="door-open-backdrop" data-door-open-cancel aria-hidden="true"></div>
+    <button id="door-open-button" type="button" class="door-open-button"
+            aria-label="Open door. Press once to confirm, then press again to send."
+            aria-expanded="false">
+      <svg class="icon icon-large door-open-icon" aria-hidden="true"><use href="#icon-door"></use></svg>
+      <span class="door-open-label">Open door</span>
+    </button>
+    <p id="door-open-feedback" class="door-open-feedback" tabindex="-1" aria-live="polite"></p>
+  {{end}}
+</div>
+{{end}}

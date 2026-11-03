@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 	"testing"
@@ -186,6 +187,81 @@ func TestAccessMultiCardAnyMatchOpens(t *testing.T) {
 		f.store.db.Model(&CardRead{}).Count(&reads)
 		return reads == 2
 	})
+}
+
+func TestRemoteOpenPublishesAndLogsEntry(t *testing.T) {
+	f := newAccessFixture(t)
+	user := seedUser(t, f.store, "remote@example.com", "pw", false)
+
+	if err := f.access.OpenDoorForUser(user.ID); err != nil {
+		t.Fatalf("remote open: %v", err)
+	}
+	if got := waitFor(t, f.door); got != DoorOpen {
+		t.Fatalf("doorControl = %q, want %q", got, DoorOpen)
+	}
+
+	waitForCondition(t, func() bool {
+		var count int64
+		f.store.db.Model(&Entry{}).Where("user_id = ?", user.ID).Count(&count)
+		return count == 1
+	})
+	var entry Entry
+	if err := f.store.db.Where("user_id = ?", user.ID).First(&entry).Error; err != nil {
+		t.Fatalf("load remote entry: %v", err)
+	}
+	if entry.CardUID != nil {
+		t.Fatalf("remote entry CardUID = %v, want nil", entry.CardUID)
+	}
+}
+
+func TestRemoteOpenChecksCurrentAccessAndActiveUser(t *testing.T) {
+	f := newAccessFixture(t)
+	allowed := seedUser(t, f.store, "allowed-remote@example.com", "pw", false)
+	denied := seedUser(t, f.store, "denied-remote@example.com", "pw", false)
+	inactive := seedUser(t, f.store, "inactive-remote@example.com", "pw", false)
+	for _, user := range []*User{allowed, denied} {
+		if err := f.store.SetUserPermanentAccess(user.ID, false); err != nil {
+			t.Fatalf("make user scheduled-only: %v", err)
+		}
+	}
+	if err := f.store.SetUserActive(inactive.ID, false); err != nil {
+		t.Fatalf("deactivate user: %v", err)
+	}
+
+	now := time.Now().UTC()
+	if err := f.store.CreateManualAccessGrant(allowed.ID, now.Add(-time.Minute), now.Add(time.Minute)); err != nil {
+		t.Fatalf("create current grant: %v", err)
+	}
+	if err := f.store.CreateManualAccessGrant(denied.ID, now.Add(-2*time.Hour), now.Add(-time.Hour)); err != nil {
+		t.Fatalf("create expired grant: %v", err)
+	}
+
+	if canOpen, err := f.access.CanOpenDoorAt(allowed.ID, now); err != nil || !canOpen {
+		t.Fatalf("current grant access = %v, err = %v; want true", canOpen, err)
+	}
+	if canOpen, err := f.access.CanOpenDoorAt(denied.ID, now); err != nil || canOpen {
+		t.Fatalf("expired grant access = %v, err = %v; want false", canOpen, err)
+	}
+	if canOpen, err := f.access.CanOpenDoorAt(inactive.ID, now); err != nil || canOpen {
+		t.Fatalf("inactive user access = %v, err = %v; want false", canOpen, err)
+	}
+
+	if err := f.access.OpenDoorForUser(denied.ID); !errors.Is(err, ErrDoorAccessDenied) {
+		t.Fatalf("open expired grant error = %v, want ErrDoorAccessDenied", err)
+	}
+	if err := f.access.OpenDoorForUser(inactive.ID); !errors.Is(err, ErrDoorAccessDenied) {
+		t.Fatalf("open inactive user error = %v, want ErrDoorAccessDenied", err)
+	}
+	if got := len(f.door); got != 0 {
+		t.Fatalf("denied remote opens published %d door commands", got)
+	}
+
+	if err := f.access.OpenDoorForUser(allowed.ID); err != nil {
+		t.Fatalf("open with current grant: %v", err)
+	}
+	if got := waitFor(t, f.door); got != DoorOpen {
+		t.Fatalf("doorControl = %q, want %q", got, DoorOpen)
+	}
 }
 
 func TestPairingHappyPath(t *testing.T) {
