@@ -18,4 +18,36 @@
 <div id="card-list" hx-get="/htmx/cards" hx-trigger="load">
   <p aria-busy="true">Loading cards…</p>
 </div>
+
+<article>
+  <header>User</header>
+  <dl>
+    <dt>Email</dt>
+    <dd>{{.Account.Email}}</dd>
+    {{if .Account.SSOIssuer}}
+      <dt>SSO</dt>
+      <dd>{{.Account.SSOIssuer}}</dd>
+    {{end}}
+  </dl>
+
+  <h3>Change password</h3>
+  <form hx-post="/htmx/account/password" hx-target="#password-result" hx-swap="innerHTML">
+    <label>
+      Current password
+      <input type="password" name="current_password" autocomplete="current-password" required>
+    </label>
+    <div class="grid">
+      <label>
+        New password
+        <input type="password" name="new_password" autocomplete="new-password" required>
+      </label>
+      <label>
+        Confirm new password
+        <input type="password" name="confirm_password" autocomplete="new-password" required>
+      </label>
+    </div>
+    <button type="submit">Change password</button>
+  </form>
+  <div id="password-result" aria-live="polite"></div>
+</article>
 {{end}}

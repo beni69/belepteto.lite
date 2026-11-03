@@ -69,6 +69,7 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *Acces
 		r.Get("/htmx/cards/pair/status", s.handleCardPairStatus)
 		r.Delete("/htmx/cards/{id}", s.handleCardDelete)
 		r.Post("/htmx/cards/{id}/relabel", s.handleCardRelabel)
+		r.Post("/htmx/account/password", s.handlePasswordChange)
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.RequireAdmin)
@@ -95,7 +96,10 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *Acces
 
 func (s *server) handleHome(w http.ResponseWriter, r *http.Request) {
 	u := userFromContext(r.Context())
-	s.render(w, "home", map[string]any{"IsAdmin": u.Admin})
+	s.render(w, "home", map[string]any{
+		"IsAdmin": u.Admin,
+		"Account": accountViewForUser(u),
+	})
 }
 
 func (s *server) handleAdmin(w http.ResponseWriter, r *http.Request) {
