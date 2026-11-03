@@ -13,6 +13,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 type config struct {
@@ -95,11 +97,25 @@ func logLevel() slog.Level {
 }
 
 func main() {
+	if err := loadDotEnv(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel()}))
 	if err := run(logger); err != nil {
 		logger.Error("server exited with error", "err", err)
 		os.Exit(1)
 	}
+}
+
+// loadDotEnv loads local development configuration when .env is present.
+// Process environment variables take precedence over values from the file.
+func loadDotEnv() error {
+	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("load .env: %w", err)
+	}
+	return nil
 }
 
 func run(logger *slog.Logger) error {

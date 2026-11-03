@@ -8,6 +8,7 @@ require (
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/google/uuid v1.6.0
+	github.com/joho/godotenv v1.5.1
 	github.com/mochi-mqtt/server/v2 v2.7.9
 	golang.org/x/crypto v0.58.0
 	golang.org/x/oauth2 v0.36.0
