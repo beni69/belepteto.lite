@@ -105,6 +105,18 @@ func (s *Store) SetUserActive(id uint, active bool) error {
 	return nil
 }
 
+// SetUserPassword updates only the password hash for the identified user.
+func (s *Store) SetUserPassword(id uint, passwordHash string) error {
+	res := s.db.Model(&User{}).Where("id = ?", id).Update("password_hash", passwordHash)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) UserByEmail(email string) (*User, error) {
 	var users []User
 	err := s.db.Where("LOWER(email) = ?", normalizeEmail(email)).Limit(2).Find(&users).Error
