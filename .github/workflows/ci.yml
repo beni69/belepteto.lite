@@ -53,7 +53,12 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           mkdir -p dist
-          go build -trimpath -ldflags="-s -w" \
+          BUILD_VERSION=
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            BUILD_VERSION="$GITHUB_REF_NAME"
+          fi
+          go build -trimpath \
+            -ldflags="-s -w -X main.buildCommit=$GITHUB_SHA -X main.buildVersion=$BUILD_VERSION" \
             -o "dist/${{ matrix.artifact }}" .
 
       - name: Upload binary
@@ -95,4 +100,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            BUILD_COMMIT=${{ github.sha }}
+            BUILD_VERSION=${{ github.ref_name }}
           tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}

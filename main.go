@@ -105,6 +105,7 @@ func main() {
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel()}))
+	logBuildInfo(logger)
 	if err := run(logger); err != nil {
 		logger.Error("server exited with error", "err", err)
 		os.Exit(1)
