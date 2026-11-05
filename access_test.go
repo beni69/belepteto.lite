@@ -84,6 +84,18 @@ func TestAccessGrantedForActiveCard(t *testing.T) {
 		f.store.db.Model(&Entry{}).Count(&entries)
 		return reads == 1 && entries == 1
 	})
+
+	var entry Entry
+	if err := f.store.db.Where("user_id = ?", u.ID).First(&entry).Error; err != nil {
+		t.Fatalf("load card entry: %v", err)
+	}
+	uid := "aa:bb:cc:dd:00:00:00:00"
+	if entry.CardUID == nil || *entry.CardUID != hashCardUID(uid) {
+		t.Fatalf("card entry CardUID = %v, want %q", entry.CardUID, hashCardUID(uid))
+	}
+	if entry.CardUIDPrefix == nil || *entry.CardUIDPrefix != cardUIDPrefix(uid) {
+		t.Fatalf("card entry CardUIDPrefix = %v, want %q", entry.CardUIDPrefix, cardUIDPrefix(uid))
+	}
 }
 
 func TestAccessDeniedForUnknownCard(t *testing.T) {
@@ -181,12 +193,25 @@ func TestAccessMultiCardAnyMatchOpens(t *testing.T) {
 	if got := waitFor(t, f.door); got != "open 3" {
 		t.Fatalf("doorControl = %q, want %q", got, "open 3")
 	}
-	// Both scanned cards get a CardRead row.
+	// Both scanned cards get a CardRead row, and the accepted card is attached
+	// to the resulting entry.
 	waitForCondition(t, func() bool {
-		var reads int64
+		var reads, entries int64
 		f.store.db.Model(&CardRead{}).Count(&reads)
-		return reads == 2
+		f.store.db.Model(&Entry{}).Count(&entries)
+		return reads == 2 && entries == 1
 	})
+	var entry Entry
+	if err := f.store.db.Where("user_id = ?", u.ID).First(&entry).Error; err != nil {
+		t.Fatalf("load multi-card entry: %v", err)
+	}
+	uid := "aa:bb:cc:02"
+	if entry.CardUID == nil || *entry.CardUID != hashCardUID(uid) {
+		t.Fatalf("multi-card entry CardUID = %v, want %q", entry.CardUID, hashCardUID(uid))
+	}
+	if entry.CardUIDPrefix == nil || *entry.CardUIDPrefix != cardUIDPrefix(uid) {
+		t.Fatalf("multi-card entry CardUIDPrefix = %v, want %q", entry.CardUIDPrefix, cardUIDPrefix(uid))
+	}
 }
 
 func TestRemoteOpenPublishesAndLogsEntry(t *testing.T) {
