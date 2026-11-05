@@ -60,3 +60,19 @@ func logBuildIdentity(logger *slog.Logger, identity buildIdentity) {
 	}
 	logger.Info("build information", attrs...)
 }
+
+type buildView struct {
+	Version string
+	Commit  string
+}
+
+func buildViewFor(identity buildIdentity) buildView {
+	version := identity.version
+	if version == "" {
+		version = "dev"
+	}
+	return buildView{
+		Version: version,
+		Commit:  identity.commit,
+	}
+}

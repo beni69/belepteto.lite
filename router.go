@@ -18,6 +18,7 @@ type server struct {
 	access           *AccessService
 	externalAPIToken string
 	sso              *oidcAuthenticator
+	build            buildView
 }
 
 func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *AccessService, externalAPIToken string, sso *oidcAuthenticator) http.Handler {
@@ -28,6 +29,7 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *Acces
 		access:           access,
 		externalAPIToken: externalAPIToken,
 		sso:              sso,
+		build:            buildViewFor(currentBuildIdentity()),
 	}
 
 	r := chi.NewRouter()
@@ -136,7 +138,8 @@ func (s *server) canOpenDoorForPage(user *User) bool {
 	return allowed
 }
 
-func (s *server) render(w http.ResponseWriter, name string, data any) {
+func (s *server) render(w http.ResponseWriter, name string, data map[string]any) {
+	data["Build"] = s.build
 	if err := s.tmpl.Page(w, name, data); err != nil {
 		s.logger.Error("render page", "page", name, "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
