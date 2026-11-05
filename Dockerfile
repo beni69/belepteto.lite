@@ -10,9 +10,13 @@ COPY . .
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG BUILD_COMMIT=unknown
+ARG BUILD_VERSION=
 ENV CGO_ENABLED=0
 RUN GOOS="$TARGETOS" GOARCH="$TARGETARCH" \
-    go build -trimpath -ldflags="-s -w" -o /out/belepteto .
+    go build -trimpath \
+    -ldflags="-s -w -X main.buildCommit=${BUILD_COMMIT} -X main.buildVersion=${BUILD_VERSION}" \
+    -o /out/belepteto .
 
 # Keep the database directory writable while still running as a numeric
 # non-root user in the scratch image.

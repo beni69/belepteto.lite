@@ -8,6 +8,19 @@ body.app-shell {
   min-height: 100vh;
 }
 
+.build-version {
+  display: block;
+  max-width: 84rem;
+  margin: 0 auto;
+  padding: 0 1.25rem 1rem;
+  color: var(--pico-muted-color);
+  font-size: 0.72rem;
+  line-height: 1;
+  opacity: 0.75;
+  text-align: left;
+  white-space: nowrap;
+}
+
 .icon-sprite {
   position: absolute;
   width: 0;
@@ -1282,6 +1295,10 @@ body.door-open-armed {
   .admin-card-row > button {
     grid-column: 2;
     grid-row: 1;
+  }
+
+  .build-version {
+    padding-inline: 1rem;
   }
 
   .door-open-button {

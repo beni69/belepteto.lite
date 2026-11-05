@@ -38,7 +38,7 @@ no external assets. Because the SQLite driver is pure Go, cross-compiling is
 just a matter of `GOOS`/`GOARCH`:
 
 ```sh
-GOOS=linux GOARCH=arm64 go build -o belepteto-arm64 .
+make build-static GOOS=linux GOARCH=arm64
 ```
 
 On first start with an empty database, an initial admin is created. If you did
