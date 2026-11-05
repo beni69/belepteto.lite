@@ -222,6 +222,7 @@ func (a *AccessService) onCardRead(_ string, payload []byte) {
 func (a *AccessService) handleAccessRead(msg CardReadMsg, received time.Time) {
 	anyMatch := false
 	var matchedUser *User
+	var matchedCardUID string
 
 	for _, sc := range msg.Cards {
 		_, user, err := a.store.ActiveCardOwner(sc.CardID)
@@ -237,6 +238,7 @@ func (a *AccessService) handleAccessRead(msg CardReadMsg, received time.Time) {
 			if accepted {
 				anyMatch = true
 				matchedUser = user
+				matchedCardUID = sc.CardID
 			}
 		} else if !errors.Is(err, ErrNotFound) {
 			a.logger.Error("look up card owner", "err", err)
@@ -258,7 +260,11 @@ func (a *AccessService) handleAccessRead(msg CardReadMsg, received time.Time) {
 		}
 		// Record the entry (the door opening) for the matched user.
 		if matchedUser != nil {
-			if err := a.store.CreateEntry(&Entry{UserID: matchedUser.ID, CreatedAt: received}); err != nil {
+			if err := a.store.CreateEntry(&Entry{
+				UserID:    matchedUser.ID,
+				CardUID:   &matchedCardUID,
+				CreatedAt: received,
+			}); err != nil {
 				a.logger.Error("log entry", "err", err)
 			}
 		}
