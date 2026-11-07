@@ -4,6 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{template "title" .}} · beléptető.lite</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/assets/logo/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/assets/logo/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#13171f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="beléptető.lite">
   <link rel="stylesheet" href="/static/pico.min.css">
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/htmx.min.js"></script>
@@ -83,7 +90,12 @@
     <ul class="site-nav-brand">
       <li>
         <a class="brand-link" href="/">
-          <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="#icon-door"></use></svg></span>
+          <span class="brand-mark">
+            <picture class="brand-logo-picture">
+              <source srcset="/static/assets/logo/Logo.png" media="(prefers-reduced-motion: reduce)">
+              <img class="brand-logo" src="/static/assets/logo/Logo.gif" alt="">
+            </picture>
+          </span>
           <strong>beléptető.lite</strong>
         </a>
       </li>

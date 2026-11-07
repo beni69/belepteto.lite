@@ -277,7 +277,8 @@ func origin(u *url.URL) string {
 
 func reservedCallbackPath(path string) bool {
 	if path == "/" || path == "/healthz" || path == "/login" || path == "/logout" ||
-		path == "/admin" || path == "/sso/login" || path == "/htmx" || path == "/static" {
+		path == "/admin" || path == "/sso/login" || path == "/htmx" || path == "/static" ||
+		path == "/manifest.webmanifest" {
 		return true
 	}
 	return strings.HasPrefix(path, "/static/") || strings.HasPrefix(path, "/htmx/")

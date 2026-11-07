@@ -40,6 +40,7 @@ func newRouter(logger *slog.Logger, tmpl *Templates, store *Store, access *Acces
 	r.Use(requestLogger(logger))
 
 	r.Get("/healthz", handleHealthz)
+	r.Get("/manifest.webmanifest", handleManifest)
 
 	// Machine-to-machine API. Every endpoint in this group requires the
 	// configured external bearer token.
@@ -150,6 +151,11 @@ func handleHealthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
+}
+
+func handleManifest(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/manifest+json")
+	http.ServeFileFS(w, r, frontend.FS, "static/manifest.webmanifest")
 }
 
 func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
