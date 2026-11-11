@@ -4,6 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Log in · beléptető.lite</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/assets/logo/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/assets/logo/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#13171f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="beléptető.lite">
   <link rel="stylesheet" href="/static/pico.min.css">
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/htmx.min.js"></script>
@@ -11,12 +18,10 @@
 <body class="app-shell">
   <main class="container app-main login-main">
     <article class="panel login-panel">
-      <div class="login-brand-mark" aria-hidden="true">
-        <svg class="icon icon-large" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 21h16M6 21V5a2 2 0 0 1 1.6-2l8-1.6A2 2 0 0 1 18 3.36V21"></path>
-          <path d="M14 12h.01"></path>
-        </svg>
-      </div>
+      <picture class="login-brand-mark" aria-hidden="true">
+        <source srcset="/static/assets/logo/Logo.png" media="(prefers-reduced-motion: reduce)">
+        <img class="brand-logo" src="/static/assets/logo/Logo.gif" alt="">
+      </picture>
       <hgroup class="login-heading">
         <h1>beléptető.lite</h1>
         <p>Log in to continue</p>
